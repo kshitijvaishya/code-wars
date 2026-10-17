@@ -1,0 +1,159 @@
+import { Request, Response, NextFunction } from 'express';
+import { Problem } from '../models/Problem';
+import { sendSuccess, sendError } from '../utils/apiResponse';
+import { AuditLog } from '../models/AuditLog';
+import mongoose from 'mongoose';
+
+export async function listProblems(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { difficulty, tags, page = '1', pageSize = '20', search } = req.query as Record<string, string>;
+    const query: Record<string, unknown> = { isPublished: true };
+
+    if (difficulty) query.difficulty = difficulty;
+    if (tags) query.tags = { $in: tags.split(',') };
+    if (search) query.title = { $regex: search, $options: 'i' };
+
+    const pg = Math.max(1, parseInt(page));
+    const ps = Math.min(50, Math.max(1, parseInt(pageSize)));
+    const skip = (pg - 1) * ps;
+
+    const [problems, total] = await Promise.all([
+      Problem.find(query).sort({ createdAt: -1 }).skip(skip).limit(ps).select('-hiddenTestCases'),
+      Problem.countDocuments(query),
+    ]);
+
+    sendSuccess(res, {
+      items: problems,
+      total,
+      page: pg,
+      pageSize: ps,
+      totalPages: Math.ceil(total / ps),
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getProblem(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const problem = await Problem.findOne({
+      $or: [{ _id: mongoose.isValidObjectId(req.params.id) ? req.params.id : null }, { slug: req.params.id }],
+      isPublished: true,
+    }).select('-hiddenTestCases');
+
+    if (!problem) {
+      sendError(res, 'NOT_FOUND', 'Problem not found', 404);
+      return;
+    }
+    sendSuccess(res, problem);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function createProblem(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { title, difficulty, tags, description, inputFormat, outputFormat,
+            constraints, notes, sampleTestCases, hiddenTestCases,
+            timeLimitMs, memoryLimitMb, supportedLanguages } = req.body;
+
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const existing = await Problem.findOne({ slug });
+    const finalSlug = existing ? `${slug}-${Date.now()}` : slug;
+
+    const problem = new Problem({
+      title, slug: finalSlug, difficulty, tags, description,
+      inputFormat, outputFormat, constraints, notes,
+      sampleTestCases, hiddenTestCases, timeLimitMs, memoryLimitMb,
+      supportedLanguages,
+      createdBy: req.user!.userId,
+      isPublished: false,
+    });
+
+    await problem.save();
+
+    await AuditLog.create({
+      actorId: req.user!.userId,
+      action: 'problem.created',
+      resourceType: 'problem',
+      resourceId: problem._id.toString(),
+      metadata: { title },
+      ip: req.ip,
+    });
+
+    const safe = await Problem.findById(problem._id).select('-hiddenTestCases');
+    sendSuccess(res, safe, 201);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateProblem(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const problem = await Problem.findById(req.params.id);
+    if (!problem) {
+      sendError(res, 'NOT_FOUND', 'Problem not found', 404);
+      return;
+    }
+
+    const allowedFields = ['title', 'difficulty', 'tags', 'description', 'inputFormat',
+      'outputFormat', 'constraints', 'notes', 'sampleTestCases', 'hiddenTestCases',
+      'timeLimitMs', 'memoryLimitMb', 'supportedLanguages', 'isPublished'];
+
+    for (const field of allowedFields) {
+      if (req.body[field] !== undefined) {
+        (problem as unknown as Record<string, unknown>)[field] = req.body[field];
+      }
+    }
+
+    await problem.save();
+    const safe = await Problem.findById(problem._id).select('-hiddenTestCases');
+    sendSuccess(res, safe);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function deleteProblem(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const problem = await Problem.findByIdAndDelete(req.params.id);
+    if (!problem) {
+      sendError(res, 'NOT_FOUND', 'Problem not found', 404);
+      return;
+    }
+    sendSuccess(res, { message: 'Problem deleted' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Admin only — includes hidden test cases
+export async function getAdminProblem(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const problem = await Problem.findById(req.params.id).select('+hiddenTestCases');
+    if (!problem) {
+      sendError(res, 'NOT_FOUND', 'Problem not found', 404);
+      return;
+    }
+    sendSuccess(res, problem);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function listAdminProblems(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { page = '1', pageSize = '20' } = req.query as Record<string, string>;
+    const pg = Math.max(1, parseInt(page));
+    const ps = Math.min(50, Math.max(1, parseInt(pageSize)));
+
+    const [problems, total] = await Promise.all([
+      Problem.find({}).sort({ createdAt: -1 }).skip((pg - 1) * ps).limit(ps).select('-hiddenTestCases'),
+      Problem.countDocuments({}),
+    ]);
+
+    sendSuccess(res, { items: problems, total, page: pg, pageSize: ps, totalPages: Math.ceil(total / ps) });
+  } catch (err) {
+    next(err);
+  }
+}
