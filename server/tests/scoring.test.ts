@@ -117,15 +117,15 @@ describe('Verdict mapping', () => {
     13: 'INTERNAL_ERROR',
   };
 
-  it('maps Judge0 status 3 to ACCEPTED', () => {
+  it('maps status 3 to ACCEPTED', () => {
     expect(STATUS_MAP[3]).toBe('ACCEPTED');
   });
 
-  it('maps Judge0 status 5 to TIME_LIMIT_EXCEEDED', () => {
+  it('maps status 5 to TIME_LIMIT_EXCEEDED', () => {
     expect(STATUS_MAP[5]).toBe('TIME_LIMIT_EXCEEDED');
   });
 
-  it('maps Judge0 status 6 to COMPILATION_ERROR', () => {
+  it('maps status 6 to COMPILATION_ERROR', () => {
     expect(STATUS_MAP[6]).toBe('COMPILATION_ERROR');
   });
 

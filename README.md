@@ -1,6 +1,6 @@
 # ⚔️ Code Wars — 1v1 Coding Battle Platform
 
-A production-oriented real-time 1v1 coding battle platform built with React, Node.js, MongoDB, Socket.IO, and Judge0.
+A production-oriented real-time 1v1 coding battle platform built with React, Node.js, MongoDB, Socket.IO, and Piston API.
 
 ---
 
@@ -11,7 +11,7 @@ A production-oriented real-time 1v1 coding battle platform built with React, Nod
 - Node.js 20+
 - MongoDB (local or Atlas)
 - Docker & Docker Compose (optional, for full stack)
-- Judge0 CE API key (or self-hosted instance)
+- Piston API access (public or self-hosted)
 
 ### 1. Environment Setup
 
@@ -24,8 +24,8 @@ Required variables:
 - `MONGODB_URI` — MongoDB connection string
 - `JWT_SECRET` — 64+ character random string
 - `JWT_REFRESH_SECRET` — Another 64+ character random string
-- `JUDGE0_BASE_URL` — Judge0 instance URL
-- `JUDGE0_API_KEY` — Optional: API key for hosted Judge0
+- `PISTON_BASE_URL` — Piston API URL (defaults to https://emkc.org/api/v2/piston)
+- `PISTON_API_KEY` — Optional: API key if your Piston deployment requires authentication
 
 Generate secrets:
 ```bash
@@ -75,9 +75,13 @@ docker-compose up -d
 
 This starts:
 - MongoDB (port 27017)
-- Judge0 + its PostgreSQL + Redis
 - API server (port 5000)
 - Nginx frontend (port 80)
+
+The server uses the public Piston API by default. For production, consider:
+- Using a self-hosted Piston instance for better reliability and control
+- Setting up rate limiting and monitoring
+- Configuring appropriate resource limits
 
 Access at: http://localhost
 
@@ -89,7 +93,7 @@ Access at: http://localhost
 client/          React + Vite + TypeScript + Tailwind + Monaco Editor
 server/          Node.js + Express + TypeScript + Mongoose
 shared/          Shared TypeScript types
-docker-compose   MongoDB + Judge0 + server + client
+docker-compose   MongoDB + server + client
 ```
 
 ### Battle State Machine
@@ -195,9 +199,47 @@ cd client && npm test
 
 ## Security Notes
 
-- User code **never** executes in the Node.js process. All execution goes through Judge0's sandboxed environment (cgroups + namespace isolation).
+- User code **never** executes in the Node.js process. All execution goes through Piston's API, which provides sandboxed code execution.
+- **Important**: The public Piston API (emkc.org) is a free community service. For production use, consider:
+  - Self-hosting Piston for better control and reliability
+  - Implementing additional rate limiting
+  - Monitoring execution patterns
+  - Understanding that public instance availability and limits may vary
 - Hidden test cases are stored with MongoDB `select: false` and stripped from all public API responses.
 - JWT access tokens expire in 15 minutes; refresh tokens rotate on use.
 - Rate limiting on auth (10 req/15min) and submissions (10 req/min).
 - All Socket.IO events validate the authenticated user's identity server-side. Client-supplied scores, verdicts, and timestamps are never trusted.
 - Battle finalization is atomic (MongoDB `findOneAndUpdate` with state guard) — prevents double finalization.
+
+## Code Execution Engine
+
+This platform uses **Piston** for code compilation and execution:
+
+- **Public Instance**: https://emkc.org/api/v2/piston (free, community-hosted)
+- **Self-Hosted**: Follow the [Piston installation guide](https://github.com/engineer-man/piston) for production deployments
+
+### Supported Languages
+
+The platform supports multiple languages through Piston's runtime system. Use the `/api/submissions/languages` endpoint to get the current list of available languages and versions.
+
+Common supported languages include:
+- C, C++, C#
+- Java, JavaScript, TypeScript
+- Python, Ruby, Go
+- Rust, Kotlin, Swift
+- PHP, SQL
+
+### Self-Hosting Piston
+
+For production use, self-hosting is recommended:
+
+```bash
+git clone https://github.com/engineer-man/piston
+cd piston
+docker-compose up -d
+```
+
+Then update your `.env`:
+```
+PISTON_BASE_URL=http://your-piston-host:2000/api/v2/piston
+```

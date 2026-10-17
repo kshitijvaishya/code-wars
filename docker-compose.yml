@@ -12,39 +12,6 @@ services:
     environment:
       MONGO_INITDB_DATABASE: codewars
 
-  judge0:
-    image: judge0/judge0:1.13.1
-    container_name: cw-judge0
-    restart: unless-stopped
-    ports:
-      - '2358:2358'
-    privileged: true
-    environment:
-      REDIS_URL: redis://cw-redis:6379
-      POSTGRES_HOST: cw-judge0-db
-      POSTGRES_DB: judge0
-      POSTGRES_USER: judge0
-      POSTGRES_PASSWORD: judge0password
-    depends_on:
-      - cw-judge0-db
-      - cw-redis
-
-  cw-judge0-db:
-    image: postgres:16-alpine
-    container_name: cw-judge0-db
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: judge0
-      POSTGRES_USER: judge0
-      POSTGRES_PASSWORD: judge0password
-    volumes:
-      - judge0_db:/var/lib/postgresql/data
-
-  cw-redis:
-    image: redis:7-alpine
-    container_name: cw-redis
-    restart: unless-stopped
-
   server:
     build:
       context: ./server
@@ -57,10 +24,9 @@ services:
       - .env
     environment:
       MONGODB_URI: mongodb://cw-mongodb:27017/codewars
-      JUDGE0_BASE_URL: http://cw-judge0:2358
+      PISTON_BASE_URL: https://emkc.org/api/v2/piston
     depends_on:
       - mongodb
-      - judge0
 
   client:
     build:
@@ -75,4 +41,3 @@ services:
 
 volumes:
   mongodb_data:
-  judge0_db:

@@ -14,11 +14,11 @@
 │                   BACKEND API (Node.js/Express)         │
 │  Auth │ Problems │ Contests │ Submissions │ Leaderboard │
 └──────────────┬──────────────────────────────────────────┘
-               │ REST (Judge0 API)
+               │ REST (Piston API)
 ┌──────────────▼──────────────────┐    ┌──────────────────┐
 │   CODE EXECUTION ENGINE         │    │   DATABASE        │
-│   Judge0 (self-hosted Docker)   │    │   PostgreSQL       │
-│   or Judge0 CE public API       │    │                   │
+│   Piston API                    │    │   MongoDB         │
+│   (public or self-hosted)       │    │                   │
 └─────────────────────────────────┘    └──────────────────┘
 ```
 
@@ -129,24 +129,31 @@ contest_leaderboard (user_id, contest_id, total_score, penalty_time,
 
 ### 2.4 Code Execution Engine
 
-- **Primary:** Judge0 CE (open-source, self-hosted via Docker)
-- **Fallback / Dev:** Judge0 public CE API (`https://ce.judge0.com/`) with API key
+- **Piston API** - Open-source code execution engine
+- **Public Instance:** `https://emkc.org/api/v2/piston` (free, community-hosted)
+- **Self-Hosted:** Recommended for production deployments
 
 #### Submission Flow
-1. Backend creates a batch submission to Judge0 with all test cases.
-2. Poll Judge0 every 500ms until all results are ready (status ≠ 1 or 2).
-3. Map Judge0 status IDs to Code Wars verdicts:
+1. Backend creates parallel execution requests to Piston for all test cases.
+2. Piston executes code in isolated containers with resource limits.
+3. Map Piston execution results to Code Wars verdicts:
 
-| Judge0 Status | Code Wars Verdict |
+| Piston Result | Code Wars Verdict |
 |--------------|-------------------|
-| 3 | Accepted |
-| 4 | Wrong Answer |
-| 5 | Time Limit Exceeded |
-| 6 | Compilation Error |
-| 7–12 | Runtime Error |
-| 13 | Internal Error |
+| Exit code 0, output matches | Accepted |
+| Exit code 0, output differs | Wrong Answer |
+| Compilation error | Compilation Error |
+| Non-zero exit code | Runtime Error |
+| Signal/timeout | Time Limit Exceeded |
+| API error | Internal Error |
 
 4. Aggregate scores, update DB, push via WebSocket.
+
+#### Key Differences from Judge0
+- No native batch API - executions run in parallel
+- Verdict determination based on exit codes and output comparison
+- Results stored in-memory (production should use Redis)
+- Language mapping layer maintains backward compatibility with Judge0 language IDs
 
 ---
 
@@ -186,10 +193,14 @@ code-wars/
 │   │   ├── routes/
 │   │   ├── controllers/
 │   │   ├── services/
-│   │   │   ├── judge.service.ts    # Judge0 integration
-│   │   │   ├── scoring.service.ts  # Score aggregation
-│   │   │   └── leaderboard.service.ts
-│   │   ├── models/           # Prisma schema / raw pg models
+│   │   │   ├── submission.service.ts  # Submission processing
+│   │   │   ├── scoring.service.ts     # Score aggregation
+│   │   │   └── battle.service.ts      # Battle management
+│   │   ├── judge/            # Code execution providers
+│   │   │   ├── piston.provider.ts     # Piston API integration
+│   │   │   ├── types.ts               # Judge provider interface
+│   │   │   └── index.ts               # Provider singleton
+│   │   ├── models/           # Mongoose schemas
 │   │   ├── middleware/
 │   │   ├── sockets/          # Socket.io handlers
 │   │   └── types/
@@ -197,7 +208,7 @@ code-wars/
 │
 ├── shared/                   # Shared types between client + server
 │
-├── docker-compose.yml        # PostgreSQL + Judge0 + server
+├── docker-compose.yml        # MongoDB + server + client
 ├── docs/                     # This documentation
 └── README.md
 ```
@@ -206,12 +217,17 @@ code-wars/
 
 ## 4. Security Considerations
 
-- All code execution runs inside Judge0's isolated sandbox (cgroups, namespace isolation).
+- All code execution runs through Piston's API with isolated container execution.
 - No user code runs on the main application server.
+- **Public Piston considerations:**
+  - Free community service with shared resources
+  - Consider self-hosting for production reliability
+  - Implement additional rate limiting
+  - Monitor execution patterns
 - JWT tokens with short expiry + refresh token pattern.
 - Rate limiting on `/submissions` endpoints.
 - Input validation with Zod on all API routes.
-- SQL via parameterized queries (Prisma ORM or pg with tagged templates).
+- MongoDB queries use Mongoose with proper sanitization.
 - CORS restricted to frontend origin.
-- Problem setter can only edit their own problems (unless admin).
-- Admin role required for contest management.
+- Hidden test cases never sent to client (MongoDB `select: false`).
+- Admin role required for problem management.

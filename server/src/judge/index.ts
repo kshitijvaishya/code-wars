@@ -1,12 +1,12 @@
-import { Judge0Provider } from './judge0.provider';
+import { PistonProvider } from './piston.provider';
 import type { IJudgeProvider } from './types';
 
-// Singleton judge provider — swap Judge0Provider for another implementation here
+// Singleton judge provider — using Piston for code execution
 let provider: IJudgeProvider | null = null;
 
 export function getJudgeProvider(): IJudgeProvider {
   if (!provider) {
-    provider = new Judge0Provider();
+    provider = new PistonProvider();
   }
   return provider;
 }

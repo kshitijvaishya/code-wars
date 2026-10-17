@@ -4,7 +4,7 @@ import { useAuthStore } from '../store/authStore';
 const FEATURES = [
   { icon: '⚔️', title: '1v1 Battle Rooms', desc: 'Create private rooms or use quick matchmaking to face an opponent.' },
   { icon: '⚡', title: 'Real-time Arena', desc: 'Watch your opponent\'s status live while you code. Every second counts.' },
-  { icon: '🤖', title: 'Secure Judging', desc: 'Server-side sandboxed code execution via Judge0 — no client cheating.' },
+  { icon: '🤖', title: 'Secure Judging', desc: 'Server-side sandboxed code execution via Piston API — no client cheating.' },
   { icon: '📊', title: 'Elo Ratings', desc: 'Climb the global leaderboard with a documented Elo-based rating system.' },
   { icon: '🎯', title: 'Configurable Scoring', desc: 'First Accepted, Score-Based, Time-Based, or Best-of-Three modes.' },
   { icon: '🔒', title: 'Hidden Tests', desc: 'Hidden test cases are never exposed — only verdicts reach the client.' },

@@ -106,7 +106,7 @@ describe('Source code size limits', () => {
   });
 });
 
-describe('Judge0 status mapping', () => {
+describe('Piston/execution status mapping', () => {
   const STATUS_MAP: Record<number, Verdict> = {
     1: 'PENDING',
     2: 'PROCESSING',

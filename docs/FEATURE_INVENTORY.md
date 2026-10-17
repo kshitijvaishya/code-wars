@@ -163,7 +163,7 @@ _Observed from HackerRank public UI + docs. Each feature is classified as: **Con
 
 | Feature | Source |
 |---------|--------|
-| Code execution sandbox (Judge0 or equivalent) | Confirmed Observed (Judge0 is industry standard) |
+| Code execution sandbox (Piston or equivalent) | Confirmed Observed (Piston is modern open-source standard) |
 | Queue-based submission processing | Confirmed Observed |
 | Per-language time/memory limits | Confirmed Observed |
 | Plagiarism detection (out of scope v1) | Confirmed Observed |

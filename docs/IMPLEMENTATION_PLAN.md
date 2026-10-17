@@ -8,9 +8,9 @@ Code Wars is a competitive coding platform inspired by observed HackerRank publi
 
 **Tech Stack:**
 - Frontend: React 18 + TypeScript + Tailwind CSS + Monaco Editor
-- Backend: Node.js + Express + TypeScript + Prisma ORM
-- Database: PostgreSQL
-- Code Execution: Judge0 CE (Docker) with public API fallback
+- Backend: Node.js + Express + TypeScript + Mongoose ORM
+- Database: MongoDB
+- Code Execution: Piston API (public or self-hosted)
 - Real-time: Socket.io
 - Auth: JWT (access + refresh tokens)
 
@@ -22,7 +22,7 @@ Code Wars is a competitive coding platform inspired by observed HackerRank publi
 
 Tasks:
 1. Initialize monorepo with `client/` and `server/` packages
-2. Create `docker-compose.yml` with PostgreSQL + Judge0 CE services
+2. Create `docker-compose.yml` with MongoDB service
 3. Set up Express server with TypeScript
 4. Set up Prisma schema (users, problems, test_cases, submissions, contests, leaderboard tables)
 5. Implement auth routes: register, login, refresh, me
@@ -61,7 +61,7 @@ Tasks:
 2. Code stubs display (read-only header/footer, editable body)
 3. Auto-save to `code_drafts` table (debounced every 30s)
 4. Version history modal (list drafts, diff view, revert)
-5. Run Code API (`POST /submissions/run`): execute against samples only via Judge0
+5. Run Code API (`POST /submissions/run`): execute against samples only via Piston API
 6. Run Code output panel: per-test-case STDOUT, Expected Output, Debug Output
 7. Custom input tab for Run Code
 8. Language execution environment info modal
@@ -75,9 +75,9 @@ Tasks:
 **Goal:** Full submission judging against all test cases.
 
 Tasks:
-1. Submit API (`POST /submissions`): queue all test cases to Judge0 batch API
-2. Polling loop: check Judge0 status every 500ms until all done
-3. Map Judge0 status codes → Code Wars verdicts
+1. Submit API (`POST /submissions`): execute all test cases via Piston API
+2. Parallel execution: all test cases run concurrently
+3. Map Piston execution results → Code Wars verdicts
 4. Score aggregation: partial (sum of passed test case scores), binary, dynamic
 5. Store `test_case_results` per submission
 6. Submission detail page: per-test-case verdict table (hidden cases show verdict only)

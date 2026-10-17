@@ -113,7 +113,7 @@ _Based on directly observed HackerRank behavior and logical inference for unobse
           └─► Backend:
                 ├─► Create Submission record (status: "queued")
                 ├─► For each test case:
-                │     ├─► POST to code execution engine (Judge0 API or internal)
+                │     ├─► POST to code execution engine (Piston API)
                 │     │     Body: { source_code, language_id, stdin, expected_output, time_limit, memory_limit }
                 │     ├─► Poll / wait for result (status 1→2→3+)
                 │     └─► Record test case result (verdict, time, memory, stdout)

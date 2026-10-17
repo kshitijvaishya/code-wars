@@ -146,7 +146,7 @@ async function processSubmission(
     }));
 
     const tokens = await judge.submitBatch(requests);
-    await Submission.findByIdAndUpdate(submissionId, { judge0Tokens: tokens });
+    await Submission.findByIdAndUpdate(submissionId, { executionTokens: tokens });
 
     const results = await judge.getResults(tokens);
 

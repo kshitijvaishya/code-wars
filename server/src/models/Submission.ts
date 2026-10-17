@@ -26,7 +26,7 @@ export interface ISubmission extends Document {
   memoryUsedKb: number | null;
   compilationOutput: string | null;
   testCaseResults: ITestCaseResult[];
-  judge0Tokens: string[];
+  executionTokens: string[]; // Execution engine tokens (Piston, Judge0, etc.)
   submittedAt: Date;
   judgedAt: Date | null;
   idempotencyKey: string;
@@ -62,7 +62,7 @@ const SubmissionSchema = new Schema<ISubmission>(
     memoryUsedKb: { type: Number, default: null },
     compilationOutput: { type: String, default: null },
     testCaseResults: { type: [TestCaseResultSchema], default: [] },
-    judge0Tokens: { type: [String], default: [] },
+    executionTokens: { type: [String], default: [] }, // Execution engine tokens
     submittedAt: { type: Date, default: Date.now },
     judgedAt: { type: Date, default: null },
     idempotencyKey: { type: String, required: true, unique: true },
