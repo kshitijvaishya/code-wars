@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { problemApi } from '../api/problem.api';
-import type { Problem, Difficulty } from '../types';
+import type { Difficulty } from '../types';
 import { Spinner } from '../components/ui/Spinner';
 import toast from 'react-hot-toast';
 

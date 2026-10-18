@@ -28,11 +28,11 @@ function SocketInitializer() {
 }
 
 function AppRoutes() {
-  const { isAuthenticated, isLoading, restoreSession } = useAuthStore();
+  const { isLoading, restoreSession } = useAuthStore();
 
   useEffect(() => {
     restoreSession();
-  }, []);
+  }, [restoreSession]);
 
   if (isLoading) return <FullPageSpinner />;
 
@@ -105,6 +105,14 @@ function AppRoutes() {
         />
         <Route
           path="/admin/problems/:id"
+          element={
+            <ProtectedRoute roles={['contest_admin', 'super_admin']}>
+              <ProblemEditorPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/problems/:id/edit"
           element={
             <ProtectedRoute roles={['contest_admin', 'super_admin']}>
               <ProblemEditorPage />

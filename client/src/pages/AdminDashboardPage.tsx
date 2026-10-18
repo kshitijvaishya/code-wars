@@ -12,6 +12,8 @@ interface AdminStats {
   activeBattles: number;
   totalBattles: number;
   totalSubmissions: number;
+  publishedProblems: number;
+  draftProblems: number;
 }
 
 export default function AdminDashboardPage() {
@@ -19,17 +21,19 @@ export default function AdminDashboardPage() {
   const [problems, setProblems] = useState<PaginatedResult<Problem> | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'problems' | 'users'>('overview');
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
 
   useEffect(() => {
     Promise.all([
       apiClient.get('/admin/stats').then(extractData<AdminStats>),
-      problemApi.adminList({ pageSize: 20 }),
+      problemApi.adminList({ pageSize: 20, search: search || undefined, status: statusFilter || undefined }),
     ]).then(([s, p]) => {
       setStats(s);
       setProblems(p);
     }).catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [search, statusFilter]);
 
   const togglePublish = async (problem: Problem) => {
     try {
@@ -89,9 +93,9 @@ export default function AdminDashboardPage() {
           {activeTab === 'overview' && stats && (
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {[
-                { label: 'Total Users', value: stats.totalUsers, icon: '👥', color: 'text-brand-400' },
-                { label: 'Active Battles', value: stats.activeBattles, icon: '⚔️', color: 'text-accent-green' },
-                { label: 'Total Battles', value: stats.totalBattles, icon: '🏆', color: 'text-accent-yellow' },
+                { label: 'Published Problems', value: stats.publishedProblems, icon: '📗', color: 'text-accent-green' },
+                { label: 'Draft Problems', value: stats.draftProblems, icon: '📝', color: 'text-accent-yellow' },
+                { label: 'Active Battles', value: stats.activeBattles, icon: '⚔️', color: 'text-brand-400' },
                 { label: 'Submissions', value: stats.totalSubmissions, icon: '📨', color: 'text-accent-purple' },
               ].map(({ label, value, icon, color }) => (
                 <div key={label} className="card p-5">
@@ -105,6 +109,20 @@ export default function AdminDashboardPage() {
 
           {activeTab === 'problems' && problems && (
             <div className="card overflow-hidden">
+              <div className="flex flex-wrap gap-3 p-4 border-b border-dark-600">
+                <input
+                  className="input flex-1 min-w-52 text-sm"
+                  placeholder="Search problems..."
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                />
+                <select className="input w-40 text-sm" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                  <option value="">All statuses</option>
+                  <option value="draft">Draft</option>
+                  <option value="published">Published</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </div>
               <div className="px-4 py-3 bg-dark-700 border-b border-dark-600 grid grid-cols-12 gap-2 text-xs text-gray-500 font-semibold uppercase">
                 <div className="col-span-5">Problem</div>
                 <div className="col-span-2">Difficulty</div>
@@ -122,14 +140,30 @@ export default function AdminDashboardPage() {
                   </div>
                   <div className="col-span-2">
                     <span className={`badge ${problem.isPublished ? 'bg-green-900/40 text-green-400 border border-green-800/50' : 'bg-dark-600 text-gray-400 border border-dark-500'}`}>
-                      {problem.isPublished ? 'Published' : 'Draft'}
+                      {problem.status ?? (problem.isPublished ? 'published' : 'draft')}
                     </span>
                   </div>
                   <div className="col-span-3 flex gap-2 justify-end">
                     <Link to={`/admin/problems/${problem.id}`} className="btn-ghost text-xs px-2 py-1">Edit</Link>
                     <button onClick={() => togglePublish(problem)} className="btn-secondary text-xs px-2 py-1">
-                      {problem.isPublished ? 'Unpublish' : 'Publish'}
+                      {problem.status === 'archived' ? 'Restore' : problem.isPublished ? 'Unpublish' : 'Publish'}
                     </button>
+                    {problem.status !== 'archived' && (
+                      <button
+                        onClick={() => problemApi.update(problem.id, { status: 'archived' }).then(() => {
+                          setProblems((prev) => prev ? {
+                            ...prev,
+                            items: prev.items.map((item) => item.id === problem.id
+                              ? { ...item, status: 'archived', isPublished: false }
+                              : item),
+                          } : null);
+                          toast.success('Problem archived');
+                        }).catch(() => toast.error('Failed to archive problem'))}
+                        className="btn-secondary text-xs px-2 py-1"
+                      >
+                        Archive
+                      </button>
+                    )}
                     <button onClick={() => deleteProblem(problem.id)} className="btn-danger text-xs px-2 py-1">Del</button>
                   </div>
                 </div>

@@ -13,7 +13,7 @@ export function getSocket(): Socket | null {
 export function useSocket() {
   const accessToken = useAuthStore((s) => s.accessToken);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const { updateParticipant, updateState, setSecondsRemaining, setBattle, setMatchmaking } =
+  const { updateParticipant, updateState, setSecondsRemaining, setMatchmaking } =
     useBattleStore();
   const connectedRef = useRef(false);
 
@@ -46,33 +46,44 @@ export function useSocket() {
 
     // Battle events
     socket.on('battle:state_changed', ({ battleId, state, startTime, endTime }) => {
+      if (useBattleStore.getState().battle?.id !== battleId) return;
       updateState(state, startTime, endTime);
       if (state === 'ACTIVE') {
         toast.success('⚔️ Battle started!', { duration: 3000 });
       }
     });
 
-    socket.on('battle:participant_updated', ({ participant }) => {
+    socket.on('battle:participant_updated', ({ battleId, participant }) => {
+      if (useBattleStore.getState().battle?.id !== battleId) return;
       updateParticipant(participant);
     });
 
-    socket.on('battle:countdown', ({ secondsRemaining }) => {
+    socket.on('battle:countdown', ({ battleId, secondsRemaining }) => {
+      if (useBattleStore.getState().battle?.id !== battleId) return;
       setSecondsRemaining(secondsRemaining);
     });
 
-    socket.on('battle:timer_sync', ({ secondsRemaining }) => {
+    socket.on('battle:timer_sync', ({ battleId, secondsRemaining }) => {
+      if (useBattleStore.getState().battle?.id !== battleId) return;
       setSecondsRemaining(secondsRemaining);
     });
 
-    socket.on('battle:completed', ({ winnerId, isDraw }) => {
+    socket.on('battle:completed', ({ battleId, winnerId, isDraw }) => {
+      if (useBattleStore.getState().battle?.id !== battleId) return;
       updateState('COMPLETED');
+      toast(
+        isDraw ? '🤝 Battle drawn' : winnerId === useAuthStore.getState().user?.id ? '🏆 You won!' : 'Battle complete',
+        { duration: 4000 },
+      );
     });
 
     // Matchmaking
     socket.on('matchmaking:found', ({ battleId, inviteCode }) => {
       setMatchmaking(false);
       toast.success('🎯 Opponent found!');
-      window.location.href = `/battle/${battleId}/waiting`;
+      window.location.href = inviteCode
+        ? `/battle/join/${inviteCode}`
+        : `/battle/${battleId}/waiting`;
     });
 
     socket.on('matchmaking:cancelled', ({ reason }) => {
@@ -98,7 +109,14 @@ export function useSocket() {
       socketInstance = null;
       connectedRef.current = false;
     };
-  }, [isAuthenticated, accessToken]);
+  }, [
+    accessToken,
+    isAuthenticated,
+    setMatchmaking,
+    setSecondsRemaining,
+    updateParticipant,
+    updateState,
+  ]);
 
   const emit = useCallback(<T>(event: string, data: T) => {
     if (socketInstance?.connected) {

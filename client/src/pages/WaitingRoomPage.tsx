@@ -11,7 +11,7 @@ import toast from 'react-hot-toast';
 export default function WaitingRoomPage() {
   const { code, battleId: routeBattleId } = useParams<{ code?: string; battleId?: string }>();
   const { user } = useAuthStore();
-  const { battle, setBattle, updateParticipant, updateState, secondsRemaining } = useBattleStore();
+  const { battle, setBattle, secondsRemaining } = useBattleStore();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
@@ -45,7 +45,7 @@ export default function WaitingRoomPage() {
       }
     };
     load();
-  }, [code, routeBattleId]);
+  }, [code, navigate, routeBattleId, setBattle]);
 
   // Join via socket
   const joinBattle = async () => {
@@ -56,7 +56,7 @@ export default function WaitingRoomPage() {
       return;
     }
     setJoining(true);
-    socket.emit('battle:join', { battleId: battle.id }, (err: string | null, data?: { battleId: string }) => {
+    socket.emit('battle:join', { battleId: battle.id }, (err: string | null) => {
       setJoining(false);
       if (err) {
         toast.error(err);
@@ -71,7 +71,7 @@ export default function WaitingRoomPage() {
     if (battle?.state === 'ACTIVE' && battle.id) {
       navigate(`/battle/${battle.id}`);
     }
-  }, [battle?.state]);
+  }, [battle?.id, battle?.state, navigate]);
 
   const setReady = (ready: boolean) => {
     if (!battle) return;
@@ -130,13 +130,11 @@ export default function WaitingRoomPage() {
           player={me}
           label="You"
           isEmpty={!me}
-          isMe={true}
         />
         <PlayerCard
           player={opponent}
           label="Opponent"
           isEmpty={!opponent}
-          isMe={false}
         />
       </div>
 
@@ -202,12 +200,10 @@ function PlayerCard({
   player,
   label,
   isEmpty,
-  isMe,
 }: {
   player?: { userId: string; username: string; avatarUrl: string | null; rating: number; isReady: boolean; status: string } | undefined;
   label: string;
   isEmpty: boolean;
-  isMe: boolean;
 }) {
   return (
     <div className={`card p-4 text-center transition-all ${

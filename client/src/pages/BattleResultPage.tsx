@@ -20,7 +20,7 @@ export default function BattleResultPage() {
       .then(setBattle)
       .catch(() => navigate('/dashboard'))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, navigate]);
 
   if (loading) return <div className="flex justify-center items-center h-screen"><Spinner size="lg" /></div>;
   if (!battle) return null;
@@ -28,8 +28,6 @@ export default function BattleResultPage() {
   const me = battle.participants.find((p) => p.userId === user?.id);
   const opponent = battle.participants.find((p) => p.userId !== user?.id);
   const isWin = battle.winnerId === user?.id;
-  const isLoss = !battle.isDraw && battle.winnerId && !isWin;
-
   const resultLabel = battle.isDraw ? '🤝 Draw!' : isWin ? '🏆 Victory!' : '💀 Defeat';
   const resultColor = battle.isDraw ? 'text-accent-yellow' : isWin ? 'text-accent-green' : 'text-accent-red';
   const ratingDelta = me?.ratingDelta ?? 0;

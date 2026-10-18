@@ -147,6 +147,7 @@ Elo-based with K-factor:
 | GET | `/api/problems/:id` | Get problem (no hidden tests) |
 | POST | `/api/problems` | Create problem (admin) |
 | PUT | `/api/problems/:id` | Update problem (admin) |
+| DELETE | `/api/problems/:id` | Delete an unreferenced problem (super admin) |
 
 ### Submissions
 | Method | Path | Description |

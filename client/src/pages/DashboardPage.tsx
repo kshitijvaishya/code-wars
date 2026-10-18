@@ -4,13 +4,12 @@ import { useAuthStore } from '../store/authStore';
 import { battleApi } from '../api/battle.api';
 import { userApi } from '../api/user.api';
 import type { Battle, UserProfile } from '../types';
-import { DifficultyBadge, VerdictBadge } from '../components/ui/Badge';
+import { DifficultyBadge } from '../components/ui/Badge';
 import { Spinner } from '../components/ui/Spinner';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function DashboardPage() {
   const { user } = useAuthStore();
-  const navigate = useNavigate();
   const [recentBattles, setRecentBattles] = useState<Battle[]>([]);
   const [topPlayers, setTopPlayers] = useState<UserProfile[]>([]);
   const [loadingBattles, setLoadingBattles] = useState(true);
@@ -120,10 +119,8 @@ export default function DashboardPage() {
           ) : (
             <div className="space-y-2">
               {recentBattles.map((battle) => {
-                const me = battle.participants.find((p) => p.userId === user.id);
                 const opponent = battle.participants.find((p) => p.userId !== user.id);
                 const isWin = battle.winnerId === user.id;
-                const isLoss = !battle.isDraw && battle.winnerId && !isWin;
                 return (
                   <Link
                     key={battle.id}

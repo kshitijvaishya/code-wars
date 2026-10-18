@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { userApi } from '../api/user.api';
 import { battleApi } from '../api/battle.api';
-import type { UserProfile, RatingHistoryEntry, Battle, PaginatedResult } from '../types';
+import type { UserProfile, RatingHistoryEntry, Battle } from '../types';
 import { DifficultyBadge } from '../components/ui/Badge';
 import { Spinner } from '../components/ui/Spinner';
 import { formatDistanceToNow } from 'date-fns';
@@ -12,7 +12,7 @@ export default function ProfilePage() {
   const { username } = useParams<{ username: string }>();
   const { user: me } = useAuthStore();
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [ratingHistory, setRatingHistory] = useState<RatingHistoryEntry[]>([]);
+  const [, setRatingHistory] = useState<RatingHistoryEntry[]>([]);
   const [battles, setBattles] = useState<Battle[]>([]);
   const [loading, setLoading] = useState(true);
 

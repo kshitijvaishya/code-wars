@@ -6,7 +6,7 @@ import { useBattleStore } from '../store/battleStore';
 import { problemApi } from '../api/problem.api';
 
 export function useBattleSocket(battleId: string | undefined) {
-  const { battle, updateParticipant, updateState, setSecondsRemaining, setProblem } =
+  const { battle, setProblem } =
     useBattleStore();
   const navigate = useNavigate();
 
@@ -51,5 +51,5 @@ export function useBattleSocket(battleId: string | undefined) {
     if (battle?.state === 'ACTIVE' && battle.problemId) {
       problemApi.get(battle.problemId).then(setProblem).catch(console.error);
     }
-  }, [battle?.state, battle?.problemId]);
+  }, [battle?.problemId, battle?.state, setProblem]);
 }

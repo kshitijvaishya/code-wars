@@ -31,6 +31,8 @@ export interface IProblem extends Document {
   timeLimitMs: number;
   memoryLimitMb: number;
   supportedLanguages: number[];
+  outputSizeLimitKb?: number;
+  status: 'draft' | 'published' | 'archived';
   isPublished: boolean;
   createdBy: mongoose.Types.ObjectId;
   createdAt: Date;
@@ -66,14 +68,16 @@ const ProblemSchema = new Schema<IProblem>(
     timeLimitMs: { type: Number, default: 2000 },
     memoryLimitMb: { type: Number, default: 256 },
     supportedLanguages: { type: [Number], default: [71, 62, 63, 74, 60, 91] }, // Python3, Java, JS, TypeScript, Ruby, Node
+    outputSizeLimitKb: { type: Number, default: 1024 },
+    status: { type: String, enum: ['draft', 'published', 'archived'], default: 'draft', index: true },
     isPublished: { type: Boolean, default: false, index: true },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   },
   { timestamps: true },
 );
 
-ProblemSchema.index({ difficulty: 1, isPublished: 1 });
-ProblemSchema.index({ tags: 1, isPublished: 1 });
+ProblemSchema.index({ difficulty: 1, status: 1 });
+ProblemSchema.index({ tags: 1, status: 1 });
 
 ProblemSchema.set('toJSON', {
   transform: (_doc, ret) => {

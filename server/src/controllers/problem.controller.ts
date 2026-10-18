@@ -3,11 +3,16 @@ import { Problem } from '../models/Problem';
 import { sendSuccess, sendError } from '../utils/apiResponse';
 import { AuditLog } from '../models/AuditLog';
 import mongoose from 'mongoose';
+import { Battle } from '../models/Battle';
+import { Submission } from '../models/Submission';
+import { validateProblemPublication } from '../utils/problemValidation';
 
 export async function listProblems(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { difficulty, tags, page = '1', pageSize = '20', search } = req.query as Record<string, string>;
-    const query: Record<string, unknown> = { isPublished: true };
+    const query: Record<string, unknown> = {
+      $or: [{ status: 'published' }, { status: { $exists: false }, isPublished: true }],
+    };
 
     if (difficulty) query.difficulty = difficulty;
     if (tags) query.tags = { $in: tags.split(',') };
@@ -37,8 +42,10 @@ export async function listProblems(req: Request, res: Response, next: NextFuncti
 export async function getProblem(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const problem = await Problem.findOne({
-      $or: [{ _id: mongoose.isValidObjectId(req.params.id) ? req.params.id : null }, { slug: req.params.id }],
-      isPublished: true,
+      $and: [
+        { $or: [{ _id: mongoose.isValidObjectId(req.params.id) ? req.params.id : null }, { slug: req.params.id }] },
+        { $or: [{ status: 'published' }, { status: { $exists: false }, isPublished: true }] },
+      ],
     }).select('-hiddenTestCases');
 
     if (!problem) {
@@ -55,7 +62,7 @@ export async function createProblem(req: Request, res: Response, next: NextFunct
   try {
     const { title, difficulty, tags, description, inputFormat, outputFormat,
             constraints, notes, sampleTestCases, hiddenTestCases,
-            timeLimitMs, memoryLimitMb, supportedLanguages } = req.body;
+            timeLimitMs, memoryLimitMb, supportedLanguages, outputSizeLimitKb } = req.body;
 
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     const existing = await Problem.findOne({ slug });
@@ -66,6 +73,8 @@ export async function createProblem(req: Request, res: Response, next: NextFunct
       inputFormat, outputFormat, constraints, notes,
       sampleTestCases, hiddenTestCases, timeLimitMs, memoryLimitMb,
       supportedLanguages,
+      outputSizeLimitKb,
+      status: 'draft',
       createdBy: req.user!.userId,
       isPublished: false,
     });
@@ -98,12 +107,28 @@ export async function updateProblem(req: Request, res: Response, next: NextFunct
 
     const allowedFields = ['title', 'difficulty', 'tags', 'description', 'inputFormat',
       'outputFormat', 'constraints', 'notes', 'sampleTestCases', 'hiddenTestCases',
-      'timeLimitMs', 'memoryLimitMb', 'supportedLanguages', 'isPublished'];
+      'timeLimitMs', 'memoryLimitMb', 'supportedLanguages', 'outputSizeLimitKb'];
 
+    const requestedStatus = req.body.status ?? (
+      req.body.isPublished === true ? 'published' :
+      req.body.isPublished === false ? 'draft' : undefined
+    );
     for (const field of allowedFields) {
       if (req.body[field] !== undefined) {
         (problem as unknown as Record<string, unknown>)[field] = req.body[field];
       }
+    }
+
+    if (requestedStatus) {
+      if (requestedStatus === 'published') {
+        const errors = validateProblemPublication(problem);
+        if (errors.length) {
+          sendError(res, 'INVALID_PROBLEM', 'Problem is not ready to publish', 400, { fields: errors });
+          return;
+        }
+      }
+      problem.status = requestedStatus;
+      problem.isPublished = requestedStatus === 'published';
     }
 
     await problem.save();
@@ -116,6 +141,15 @@ export async function updateProblem(req: Request, res: Response, next: NextFunct
 
 export async function deleteProblem(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    const [battleReference, submissionReference] = await Promise.all([
+      Battle.exists({ problemId: req.params.id }),
+      Submission.exists({ problemId: req.params.id }),
+    ]);
+    if (battleReference || submissionReference) {
+      sendError(res, 'PROBLEM_IN_USE', 'Problem is referenced by battle or submission history; archive it instead', 409);
+      return;
+    }
+
     const problem = await Problem.findByIdAndDelete(req.params.id);
     if (!problem) {
       sendError(res, 'NOT_FOUND', 'Problem not found', 404);
@@ -143,13 +177,16 @@ export async function getAdminProblem(req: Request, res: Response, next: NextFun
 
 export async function listAdminProblems(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { page = '1', pageSize = '20' } = req.query as Record<string, string>;
+    const { page = '1', pageSize = '20', search, status } = req.query as Record<string, string>;
     const pg = Math.max(1, parseInt(page));
     const ps = Math.min(50, Math.max(1, parseInt(pageSize)));
 
+    const query: Record<string, unknown> = {};
+    if (status) query.status = status;
+    if (search) query.title = { $regex: search, $options: 'i' };
     const [problems, total] = await Promise.all([
-      Problem.find({}).sort({ createdAt: -1 }).skip((pg - 1) * ps).limit(ps).select('-hiddenTestCases'),
-      Problem.countDocuments({}),
+      Problem.find(query).sort({ createdAt: -1 }).skip((pg - 1) * ps).limit(ps).select('-hiddenTestCases'),
+      Problem.countDocuments(query),
     ]);
 
     sendSuccess(res, { items: problems, total, page: pg, pageSize: ps, totalPages: Math.ceil(total / ps) });

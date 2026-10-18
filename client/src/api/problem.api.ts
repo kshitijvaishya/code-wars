@@ -9,7 +9,7 @@ export const problemApi = {
     apiClient.get<{ data: Problem }>(`/problems/${id}`).then(extractData),
 
   // Admin
-  adminList: (params?: { page?: number; pageSize?: number }) =>
+  adminList: (params?: { page?: number; pageSize?: number; search?: string; status?: string }) =>
     apiClient.get<{ data: PaginatedResult<Problem> }>('/problems/admin/list', { params }).then(extractData),
 
   adminGet: (id: string) =>

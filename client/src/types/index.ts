@@ -27,6 +27,7 @@ export interface RatingHistoryEntry {
 }
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
+export type ProblemStatus = 'draft' | 'published' | 'archived';
 
 export interface SampleTestCase {
   id?: string;
@@ -51,6 +52,8 @@ export interface Problem {
   timeLimitMs: number;
   memoryLimitMb: number;
   supportedLanguages: number[];
+  outputSizeLimitKb?: number;
+  status?: ProblemStatus;
   isPublished?: boolean;
   createdAt: string;
 }

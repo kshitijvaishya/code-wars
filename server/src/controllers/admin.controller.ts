@@ -3,6 +3,7 @@ import { AuditLog } from '../models/AuditLog';
 import { Battle } from '../models/Battle';
 import { Submission } from '../models/Submission';
 import { User } from '../models/User';
+import { Problem } from '../models/Problem';
 import { sendSuccess } from '../utils/apiResponse';
 
 export async function getAuditLogs(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -33,12 +34,18 @@ export async function getDashboardStats(req: Request, res: Response, next: NextF
       totalBattles,
       totalSubmissions,
       recentBattles,
+      publishedProblems,
+      draftProblems,
+      recentProblems,
     ] = await Promise.all([
       User.countDocuments({}),
       Battle.countDocuments({ state: 'ACTIVE' }),
       Battle.countDocuments({}),
       Submission.countDocuments({}),
       Battle.find({ state: 'COMPLETED' }).sort({ updatedAt: -1 }).limit(10).populate('participants.userId', 'username'),
+      Problem.countDocuments({ $or: [{ status: 'published' }, { status: { $exists: false }, isPublished: true }] }),
+      Problem.countDocuments({ $or: [{ status: 'draft' }, { status: { $exists: false }, isPublished: false }] }),
+      Problem.find({}).sort({ updatedAt: -1 }).limit(5).select('-hiddenTestCases'),
     ]);
 
     sendSuccess(res, {
@@ -47,6 +54,9 @@ export async function getDashboardStats(req: Request, res: Response, next: NextF
       totalBattles,
       totalSubmissions,
       recentBattles,
+      publishedProblems,
+      draftProblems,
+      recentProblems,
     });
   } catch (err) {
     next(err);

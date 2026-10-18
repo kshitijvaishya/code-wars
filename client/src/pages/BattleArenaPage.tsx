@@ -6,7 +6,8 @@ import { battleApi } from '../api/battle.api';
 import { submissionApi } from '../api/submission.api';
 import { getSocket } from '../hooks/useSocket';
 import { useBattleSocket } from '../hooks/useBattleSocket';
-import { CodeEditor, LANGUAGE_MAP } from '../components/editor/CodeEditor';
+import { CodeEditor } from '../components/editor/CodeEditor';
+import { LANGUAGE_MAP } from '../components/editor/languageMap';
 import { ProblemPanel } from '../components/problem/ProblemPanel';
 import { OpponentStatus } from '../components/battle/OpponentStatus';
 import { VerdictBadge } from '../components/ui/Badge';
@@ -52,7 +53,7 @@ export default function BattleArenaPage() {
     submissionApi.getLanguages()
       .then(setLanguages)
       .catch(console.error);
-  }, [id]);
+  }, [battle, id, navigate]);
 
   // Set default code when language changes
   useEffect(() => {
@@ -90,7 +91,7 @@ export default function BattleArenaPage() {
         customInput: customInput || undefined,
       });
       setRunResults(results);
-    } catch (err: unknown) {
+    } catch {
       toast.error('Run failed. Please try again.');
     } finally {
       setRunLoading(false);

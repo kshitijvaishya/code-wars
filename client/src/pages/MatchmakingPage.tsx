@@ -5,7 +5,6 @@ import { useBattleStore } from '../store/battleStore';
 import { getSocket } from '../hooks/useSocket';
 import { battleApi } from '../api/battle.api';
 import toast from 'react-hot-toast';
-import { Spinner } from '../components/ui/Spinner';
 import type { ScoringMode } from '../types';
 
 const DIFFICULTIES = [
