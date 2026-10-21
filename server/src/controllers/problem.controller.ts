@@ -5,7 +5,7 @@ import { AuditLog } from '../models/AuditLog';
 import mongoose from 'mongoose';
 import { Battle } from '../models/Battle';
 import { Submission } from '../models/Submission';
-import { validateProblemPublication } from '../utils/problemValidation';
+import { validateProblemCreation, validateProblemPublication } from '../utils/problemValidation';
 
 export async function listProblems(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -64,7 +64,27 @@ export async function createProblem(req: Request, res: Response, next: NextFunct
             constraints, notes, sampleTestCases, hiddenTestCases,
             timeLimitMs, memoryLimitMb, supportedLanguages, outputSizeLimitKb } = req.body;
 
-    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const requestedStatus = req.body.status ?? (
+      req.body.isPublished === true ? 'published' : 'draft'
+    );
+    const candidate = {
+      ...req.body,
+      title: title ?? '',
+      sampleTestCases: sampleTestCases ?? [],
+      hiddenTestCases: hiddenTestCases ?? [],
+      supportedLanguages: supportedLanguages ?? [],
+      timeLimitMs,
+      memoryLimitMb,
+    };
+    if (requestedStatus === 'published') {
+      const errors = validateProblemCreation({ ...candidate, status: requestedStatus });
+      if (errors.length) {
+        sendError(res, 'INVALID_PROBLEM', 'Problem is not ready to publish', 400, { fields: errors });
+        return;
+      }
+    }
+
+    const slug = (title || 'untitled-problem').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     const existing = await Problem.findOne({ slug });
     const finalSlug = existing ? `${slug}-${Date.now()}` : slug;
 
@@ -74,9 +94,9 @@ export async function createProblem(req: Request, res: Response, next: NextFunct
       sampleTestCases, hiddenTestCases, timeLimitMs, memoryLimitMb,
       supportedLanguages,
       outputSizeLimitKb,
-      status: 'draft',
+      status: requestedStatus,
       createdBy: req.user!.userId,
-      isPublished: false,
+      isPublished: requestedStatus === 'published',
     });
 
     await problem.save();
@@ -169,7 +189,13 @@ export async function getAdminProblem(req: Request, res: Response, next: NextFun
       sendError(res, 'NOT_FOUND', 'Problem not found', 404);
       return;
     }
-    sendSuccess(res, problem);
+    const adminProblem = problem.toObject({ transform: false });
+    sendSuccess(res, {
+      ...adminProblem,
+      id: problem._id.toString(),
+      _id: undefined,
+      __v: undefined,
+    });
   } catch (err) {
     next(err);
   }

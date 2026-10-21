@@ -62,8 +62,8 @@ export interface ClientToServerEvents {
   // Battle
   'battle:join': (payload: { battleId?: string; inviteCode?: string }, callback: (err: string | null, data?: { battleId: string }) => void) => void;
   'battle:leave': (payload: { battleId: string }) => void;
-  'battle:ready': (payload: { battleId: string }) => void;
-  'battle:unready': (payload: { battleId: string }) => void;
+  'battle:ready': (payload: { battleId: string }, callback?: (err: string | null) => void) => void;
+  'battle:unready': (payload: { battleId: string }, callback?: (err: string | null) => void) => void;
   'battle:status_update': (payload: { battleId: string; status: ParticipantStatus }) => void;
 
   // Matchmaking

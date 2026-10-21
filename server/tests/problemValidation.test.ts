@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateProblemPublication } from '../src/utils/problemValidation';
+import { createProblemSchema, validateProblemCreation, validateProblemPublication } from '../src/utils/problemValidation';
 
 const completeProblem = {
   title: 'Two Sum',
@@ -15,6 +15,40 @@ const completeProblem = {
 };
 
 describe('problem publication validation', () => {
+  it('accepts an incomplete draft payload', () => {
+    const result = createProblemSchema.safeParse({
+      isPublished: false,
+      status: 'draft',
+    });
+
+    expect(result.success).toBe(true);
+    expect(validateProblemCreation({ status: 'draft' })).toEqual([]);
+  });
+
+  it('accepts a complete publish payload', () => {
+    const result = createProblemSchema.safeParse({
+      ...completeProblem,
+      difficulty: 'medium',
+      tags: [],
+      status: 'published',
+      isPublished: true,
+    });
+
+    expect(result.success).toBe(true);
+    expect(validateProblemCreation({ ...completeProblem, status: 'published' })).toEqual([]);
+  });
+
+  it('rejects an incomplete publish payload', () => {
+    expect(validateProblemCreation({ status: 'published' })).toContain('Title is required');
+  });
+
+  it('requires hidden tests when publishing an existing draft', () => {
+    expect(validateProblemPublication({
+      ...completeProblem,
+      hiddenTestCases: [],
+    })).toContain('At least one hidden test case is required');
+  });
+
   it('accepts a complete problem', () => {
     expect(validateProblemPublication(completeProblem)).toEqual([]);
   });

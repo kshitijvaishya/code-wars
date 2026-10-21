@@ -4,6 +4,7 @@ import { Battle } from '../models/Battle';
 import { Submission } from '../models/Submission';
 import { battleService } from '../services/battle.service';
 import { sendSuccess, sendError } from '../utils/apiResponse';
+import { getInviteError } from '../utils/battleInvite';
 
 const createBattleSchema = z.object({
   difficulty: z.enum(['easy', 'medium', 'hard']).default('medium'),
@@ -19,6 +20,7 @@ export async function createPrivateBattle(req: Request, res: Response, next: Nex
     sendSuccess(res, {
       battleId: battle._id.toString(),
       inviteCode: battle.inviteCode,
+      inviteExpiresAt: battle.inviteExpiresAt,
       inviteLink: `${process.env.CLIENT_URL ?? ''}/battle/join/${battle.inviteCode}`,
       state: battle.state,
     }, 201);
@@ -52,9 +54,15 @@ export async function getBattle(req: Request, res: Response, next: NextFunction)
 
 export async function getBattleByInviteCode(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const battle = await Battle.findOne({ inviteCode: req.params.code }).select('-participants.socketId');
+    const inviteCode = req.params.code.trim().toUpperCase();
+    const battle = await Battle.findOne({ inviteCode }).select('-participants.socketId');
     if (!battle) {
-      sendError(res, 'NOT_FOUND', 'Battle not found', 404);
+      sendError(res, 'INVALID_INVITE', 'Invite code is invalid', 404);
+      return;
+    }
+    const inviteError = getInviteError(battle, req.user!.userId);
+    if (inviteError) {
+      sendError(res, inviteError.code, inviteError.message, inviteError.status);
       return;
     }
     sendSuccess(res, battle);

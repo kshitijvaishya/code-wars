@@ -21,6 +21,7 @@ import LeaderboardPage from './pages/LeaderboardPage';
 import ProfilePage from './pages/ProfilePage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
 import ProblemEditorPage from './pages/ProblemEditorPage';
+import PracticePage from './pages/PracticePage';
 
 function SocketInitializer() {
   useSocket(); // mounts socket connection when authenticated
@@ -84,6 +85,7 @@ function AppRoutes() {
 
         {/* Problems */}
         <Route path="/problems" element={<ProblemLibraryPage />} />
+        <Route path="/problems/:slug" element={<ProtectedRoute><PracticePage /></ProtectedRoute>} />
 
         {/* Leaderboard */}
         <Route path="/leaderboard" element={<LeaderboardPage />} />

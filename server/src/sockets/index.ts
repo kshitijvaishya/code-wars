@@ -61,13 +61,14 @@ export function initializeSocket(
 
         socket.join(`battle:${bid}`);
 
-        // Notify all in room
-        io.to(`battle:${bid}`).emit('battle:participant_updated', {
-          battleId: bid,
-          participant: battleService.formatParticipant(
-            battle.participants.find((p) => p.userId.toString() === userId)!,
-          ),
-        });
+        // Broadcast the complete roster so both clients stay in sync after a
+        // join or reconnect, including a participant added after initial load.
+        for (const participant of battle.participants) {
+          io.to(`battle:${bid}`).emit('battle:participant_updated', {
+            battleId: bid,
+            participant: battleService.formatParticipant(participant),
+          });
+        }
 
         io.to(`battle:${bid}`).emit('battle:state_changed', {
           battleId: bid,
@@ -82,19 +83,21 @@ export function initializeSocket(
       }
     });
 
-    socket.on('battle:ready', async ({ battleId }) => {
+    socket.on('battle:ready', async ({ battleId }, callback) => {
       try {
         await battleService.setReady(battleId, userId, true, io);
+        callback?.(null);
       } catch (err) {
-        socket.emit('error', { code: 'READY_ERROR', message: (err as Error).message });
+        callback?.((err as Error).message);
       }
     });
 
-    socket.on('battle:unready', async ({ battleId }) => {
+    socket.on('battle:unready', async ({ battleId }, callback) => {
       try {
         await battleService.setReady(battleId, userId, false, io);
+        callback?.(null);
       } catch (err) {
-        socket.emit('error', { code: 'READY_ERROR', message: (err as Error).message });
+        callback?.((err as Error).message);
       }
     });
 

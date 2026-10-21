@@ -54,14 +54,14 @@ const HiddenTestCaseSchema = new Schema<IHiddenTestCase>({
 
 const ProblemSchema = new Schema<IProblem>(
   {
-    title: { type: String, required: true, trim: true, maxlength: 200 },
+    title: { type: String, required: true, trim: true, maxlength: 200, default: 'Untitled problem' },
     slug: { type: String, required: true, unique: true, lowercase: true, trim: true },
-    difficulty: { type: String, enum: ['easy', 'medium', 'hard'], required: true },
+    difficulty: { type: String, enum: ['easy', 'medium', 'hard'], required: true, default: 'medium' },
     tags: { type: [String], default: [], index: true },
-    description: { type: String, required: true },
-    inputFormat: { type: String, required: true },
-    outputFormat: { type: String, required: true },
-    constraints: { type: String, required: true },
+    description: { type: String, required: true, default: '' },
+    inputFormat: { type: String, required: true, default: '' },
+    outputFormat: { type: String, required: true, default: '' },
+    constraints: { type: String, required: true, default: '' },
     notes: { type: String },
     sampleTestCases: { type: [SampleTestCaseSchema], default: [] },
     hiddenTestCases: { type: [HiddenTestCaseSchema], default: [], select: false }, // excluded by default

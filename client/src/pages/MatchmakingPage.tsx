@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
 import { useBattleStore } from '../store/battleStore';
 import { getSocket } from '../hooks/useSocket';
@@ -26,6 +27,8 @@ export default function MatchmakingPage() {
   const [difficulty, setDifficulty] = useState('medium');
   const [scoringMode, setScoringMode] = useState<ScoringMode>('first_accepted');
   const [elapsed, setElapsed] = useState(0);
+  const [inviteCode, setInviteCode] = useState('');
+  const [creatingBattle, setCreatingBattle] = useState(false);
 
   useEffect(() => {
     if (!isMatchmaking) { setElapsed(0); return; }
@@ -53,13 +56,28 @@ export default function MatchmakingPage() {
   };
 
   const createPrivateBattle = async () => {
+    setCreatingBattle(true);
     try {
       const result = await battleApi.create({ difficulty, scoringMode });
       toast.success('Private battle created!');
-      navigate(`/battle/join/${result.inviteCode}`);
-    } catch {
-      toast.error('Failed to create battle');
+      navigate(`/battle/${result.battleId}/waiting`);
+    } catch (error) {
+      const message = axios.isAxiosError(error)
+        ? error.response?.data?.error?.message
+        : undefined;
+      toast.error(message ?? 'Failed to create battle');
+    } finally {
+      setCreatingBattle(false);
     }
+  };
+
+  const joinByInviteCode = () => {
+    const normalizedCode = inviteCode.trim().toUpperCase();
+    if (!normalizedCode) {
+      toast.error('Enter an invite code');
+      return;
+    }
+    navigate(`/battle/join/${encodeURIComponent(normalizedCode)}`);
   };
 
   return (
@@ -151,9 +169,29 @@ export default function MatchmakingPage() {
             <button onClick={startMatchmaking} className="btn-primary py-3 text-base">
               ⚡ Quick Match
             </button>
-            <button onClick={createPrivateBattle} className="btn-secondary py-3 text-base">
-              🔒 Private Battle
+            <button onClick={createPrivateBattle} disabled={creatingBattle} className="btn-secondary py-3 text-base">
+              {creatingBattle ? 'Creating…' : '🔒 Private Battle'}
             </button>
+          </div>
+
+          <div className="card p-5">
+            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">Join with invite code</h2>
+            <div className="flex gap-3">
+              <input
+                className="input flex-1 font-mono uppercase tracking-widest"
+                value={inviteCode}
+                onChange={(event) => setInviteCode(event.target.value.toUpperCase())}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') joinByInviteCode();
+                }}
+                placeholder="Paste invite code"
+                maxLength={32}
+                aria-label="Battle invite code"
+              />
+              <button onClick={joinByInviteCode} disabled={!inviteCode.trim()} className="btn-secondary px-5">
+                Join
+              </button>
+            </div>
           </div>
         </div>
       )}

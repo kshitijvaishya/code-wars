@@ -3,6 +3,7 @@ import { io, Socket } from 'socket.io-client';
 import { useAuthStore } from '../store/authStore';
 import { useBattleStore } from '../store/battleStore';
 import toast from 'react-hot-toast';
+import { getRemainingBattleSeconds } from '../utils/battleTimer';
 
 let socketInstance: Socket | null = null;
 
@@ -78,12 +79,10 @@ export function useSocket() {
     });
 
     // Matchmaking
-    socket.on('matchmaking:found', ({ battleId, inviteCode }) => {
+    socket.on('matchmaking:found', ({ battleId }) => {
       setMatchmaking(false);
       toast.success('🎯 Opponent found!');
-      window.location.href = inviteCode
-        ? `/battle/join/${inviteCode}`
-        : `/battle/${battleId}/waiting`;
+      window.location.href = `/battle/${battleId}/waiting`;
     });
 
     socket.on('matchmaking:cancelled', ({ reason }) => {
@@ -117,6 +116,15 @@ export function useSocket() {
     updateParticipant,
     updateState,
   ]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      const current = useBattleStore.getState().battle;
+      if (!current || current.state !== 'ACTIVE' || !current.endTime) return;
+      setSecondsRemaining(getRemainingBattleSeconds(current.endTime));
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, [setSecondsRemaining]);
 
   const emit = useCallback(<T>(event: string, data: T) => {
     if (socketInstance?.connected) {

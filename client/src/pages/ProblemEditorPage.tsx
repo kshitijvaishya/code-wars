@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { problemApi } from '../api/problem.api';
+import axios from 'axios';
 import type { Difficulty } from '../types';
 import { Spinner } from '../components/ui/Spinner';
 import toast from 'react-hot-toast';
@@ -22,6 +23,7 @@ export default function ProblemEditorPage() {
 
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [form, setForm] = useState({
     title: '',
     difficulty: 'medium' as Difficulty,
@@ -59,6 +61,13 @@ export default function ProblemEditorPage() {
           isHidden: false,
           score: 0,
         })));
+        setHiddenTCs((p.hiddenTestCases ?? []).map((tc) => ({
+          input: tc.input,
+          expectedOutput: tc.expectedOutput,
+          explanation: '',
+          isHidden: true,
+          score: tc.score,
+        })));
       }).catch(() => toast.error('Failed to load problem'))
         .finally(() => setLoading(false));
     }
@@ -79,8 +88,9 @@ export default function ProblemEditorPage() {
     setList(list.filter((_, i) => i !== idx));
 
   const handleSave = async (publish = false) => {
-    if (!form.title.trim()) { toast.error('Title is required'); return; }
-    if (!form.description.trim()) { toast.error('Description is required'); return; }
+    if (publish && !form.title.trim()) { toast.error('Title is required to publish'); return; }
+    if (publish && !form.description.trim()) { toast.error('Description is required to publish'); return; }
+    setValidationErrors([]);
     setSaving(true);
     try {
       const payload = {
@@ -92,6 +102,8 @@ export default function ProblemEditorPage() {
           expectedOutput: tc.expectedOutput,
           score: tc.score,
         })),
+        supportedLanguages: [71, 62, 63, 74, 60, 91],
+        status: publish ? 'published' as const : 'draft' as const,
         isPublished: publish,
       };
 
@@ -103,8 +115,23 @@ export default function ProblemEditorPage() {
         await problemApi.update(id!, payload);
         toast.success('Problem saved!');
       }
-    } catch {
-      toast.error('Failed to save problem');
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const responseError = error.response?.data?.error as {
+          message?: string;
+          details?: { fields?: string[] } | Record<string, string[]>;
+        } | undefined;
+        const details = responseError?.details;
+        const fields = details && 'fields' in details
+          ? details.fields ?? []
+          : details
+            ? Object.values(details).flat()
+            : [];
+        setValidationErrors(fields);
+        toast.error(responseError?.message ?? 'Failed to save problem');
+      } else {
+        toast.error('Failed to save problem');
+      }
     } finally {
       setSaving(false);
     }
@@ -124,6 +151,14 @@ export default function ProblemEditorPage() {
             {saving ? <Spinner size="sm" /> : 'Save & Publish'}
           </button>
         </div>
+        {validationErrors.length > 0 && (
+          <div role="alert" className="mt-4 rounded-lg border border-accent-red/40 bg-accent-red/10 p-4 text-sm text-accent-red">
+            <p className="font-semibold">Please fix the following:</p>
+            <ul className="mt-2 list-disc pl-5">
+              {validationErrors.map((error) => <li key={error}>{error}</li>)}
+            </ul>
+          </div>
+        )}
       </div>
 
       <div className="space-y-6">

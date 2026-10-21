@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useBattleStore } from '../store/battleStore';
 import { battleApi } from '../api/battle.api';
@@ -12,6 +12,7 @@ import { ProblemPanel } from '../components/problem/ProblemPanel';
 import { OpponentStatus } from '../components/battle/OpponentStatus';
 import { VerdictBadge } from '../components/ui/Badge';
 import { Spinner } from '../components/ui/Spinner';
+import { loadProblemCode, saveProblemCode } from '../utils/codePersistence';
 import type { RunResult, Submission, Language } from '../types';
 import toast from 'react-hot-toast';
 
@@ -26,8 +27,7 @@ const DEFAULT_CODE: Record<string, string> = {
 export default function BattleArenaPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuthStore();
-  const { battle, problem, secondsRemaining } = useBattleStore();
-  const navigate = useNavigate();
+  const { battle, problem, secondsRemaining, setBattle } = useBattleStore();
 
   const [languageId, setLanguageId] = useState(71); // Python3
   const [code, setCode] = useState('');
@@ -40,36 +40,46 @@ export default function BattleArenaPage() {
   const [activeTab, setActiveTab] = useState<'testcases' | 'custom' | 'submissions'>('testcases');
   const [fontSize, setFontSize] = useState(14);
   const [fullscreen, setFullscreen] = useState(false);
+  const [battleLoading, setBattleLoading] = useState(true);
+  const [battleError, setBattleError] = useState<string | null>(null);
   const autoSaveRef = useRef<ReturnType<typeof setTimeout>>();
 
-  useBattleSocket(id);
+  const { problemLoading, problemError } = useBattleSocket(id);
 
   // Load battle & languages
   useEffect(() => {
     if (!id) return;
-    if (!battle) {
-      battleApi.get(id).catch(() => navigate('/dashboard'));
-    }
+    setBattleLoading(true);
+    battleApi.get(id)
+      .then(setBattle)
+      .catch((error: unknown) => {
+        setBattleError(error instanceof Error ? error.message : 'Unable to load battle');
+      })
+      .finally(() => setBattleLoading(false));
     submissionApi.getLanguages()
       .then(setLanguages)
       .catch(console.error);
-  }, [battle, id, navigate]);
+  }, [id, setBattle]);
 
   // Set default code when language changes
   useEffect(() => {
     const monacoLang = LANGUAGE_MAP[languageId] ?? 'python';
-    const saved = localStorage.getItem(`cw-draft-${id}-${languageId}`);
+    const saved = problem
+      ? loadProblemCode(problem.id, languageId)
+      : null;
     setCode(saved ?? DEFAULT_CODE[monacoLang] ?? '');
-  }, [languageId, id]);
+  }, [languageId, problem]);
 
   // Autosave
   useEffect(() => {
     clearTimeout(autoSaveRef.current);
     autoSaveRef.current = setTimeout(() => {
-      if (id && code) localStorage.setItem(`cw-draft-${id}-${languageId}`, code);
+      if (problem?.id && code) {
+        saveProblemCode(problem.id, languageId, code);
+      }
     }, 2000);
     return () => clearTimeout(autoSaveRef.current);
-  }, [code, id, languageId]);
+  }, [code, languageId, problem?.id]);
 
   // Emit coding status
   useEffect(() => {
@@ -142,7 +152,10 @@ export default function BattleArenaPage() {
     return () => window.removeEventListener('editor:run', handler);
   }, [handleRun]);
 
-  if (!battle) return <div className="flex justify-center items-center h-screen"><Spinner size="lg" /></div>;
+  if (battleLoading) return <div className="flex justify-center items-center h-screen"><Spinner size="lg" /></div>;
+  if (battleError || !battle) {
+    return <div className="flex h-screen items-center justify-center p-6 text-center text-accent-red">{battleError ?? 'Battle not found'}</div>;
+  }
 
   const me = battle.participants.find((p) => p.userId === user?.id);
   const opponent = battle.participants.find((p) => p.userId !== user?.id);
@@ -161,7 +174,7 @@ export default function BattleArenaPage() {
       <div className="flex flex-1 overflow-hidden">
         {/* Problem panel */}
         <div className="w-[420px] flex-shrink-0 border-r border-dark-600 overflow-hidden flex flex-col">
-          <ProblemPanel problem={problem} loading={!problem} />
+          <ProblemPanel problem={problem} loading={problemLoading} error={problemError} />
         </div>
 
         {/* Editor + console */}

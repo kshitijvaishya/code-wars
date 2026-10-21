@@ -37,6 +37,15 @@ export interface SampleTestCase {
   explanation?: string;
 }
 
+export interface HiddenTestCase {
+  id?: string;
+  _id?: string;
+  input: string;
+  expectedOutput: string;
+  score: number;
+  timeLimitMs?: number;
+}
+
 export interface Problem {
   id: string;
   title: string;
@@ -49,6 +58,7 @@ export interface Problem {
   constraints: string;
   notes?: string;
   sampleTestCases: SampleTestCase[];
+  hiddenTestCases?: HiddenTestCase[];
   timeLimitMs: number;
   memoryLimitMb: number;
   supportedLanguages: number[];
@@ -88,6 +98,7 @@ export interface BattleParticipant {
 export interface Battle {
   id: string;
   inviteCode: string;
+  inviteExpiresAt?: string | null;
   state: BattleState;
   scoringMode: ScoringMode;
   difficulty: Difficulty;

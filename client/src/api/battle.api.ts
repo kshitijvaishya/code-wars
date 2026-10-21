@@ -3,7 +3,7 @@ import type { Battle, PaginatedResult } from '../types';
 
 export const battleApi = {
   create: (data: { difficulty: string; scoringMode: string; durationSeconds?: number }) =>
-    apiClient.post<{ data: { battleId: string; inviteCode: string; inviteLink: string; state: string } }>('/battles', data).then(extractData),
+    apiClient.post<{ data: { battleId: string; inviteCode: string; inviteExpiresAt: string; inviteLink: string; state: string } }>('/battles', data).then(extractData),
 
   get: (id: string) =>
     apiClient.get<{ data: Battle }>(`/battles/${id}`).then(extractData),

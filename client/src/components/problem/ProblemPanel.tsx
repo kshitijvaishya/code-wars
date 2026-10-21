@@ -6,16 +6,34 @@ import { DifficultyBadge } from '../ui/Badge';
 interface ProblemPanelProps {
   problem: Problem | null;
   loading?: boolean;
+  error?: string | null;
 }
 
-export function ProblemPanel({ problem, loading }: ProblemPanelProps) {
-  if (loading || !problem) {
+export function ProblemPanel({ problem, loading, error }: ProblemPanelProps) {
+  if (loading) {
     return (
       <div className="flex flex-col gap-4 p-6 animate-pulse">
         <div className="skeleton h-6 w-2/3" />
         <div className="skeleton h-4 w-1/3" />
         <div className="skeleton h-32 w-full" />
         <div className="skeleton h-20 w-full" />
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="flex h-full items-center justify-center p-6 text-center">
+        <div>
+          <p className="font-semibold text-accent-red">Unable to load problem</p>
+          <p className="mt-2 text-sm text-gray-400">{error}</p>
+        </div>
+      </div>
+    );
+  }
+  if (!problem) {
+    return (
+      <div className="flex h-full items-center justify-center p-6 text-center text-sm text-gray-500">
+        The battle problem is not available yet.
       </div>
     );
   }

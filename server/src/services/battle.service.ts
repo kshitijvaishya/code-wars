@@ -9,9 +9,10 @@ import type { ScoringMode } from '@code-wars/shared';
 import type { Server as SocketServer } from 'socket.io';
 import type { ServerToClientEvents, ClientToServerEvents, InterServerEvents, SocketData } from '@code-wars/shared';
 import { scoringService } from './scoring.service';
+import { getInviteError } from '../utils/battleInvite';
 
 function generateInviteCode(): string {
-  return crypto.randomBytes(6).toString('hex').toUpperCase(); // e.g. "A3F2B1"
+  return crypto.randomBytes(8).toString('hex').toUpperCase();
 }
 
 async function pickProblem(difficulty: string): Promise<string> {
@@ -33,34 +34,46 @@ export class BattleService {
     const user = await User.findById(userId).select('username avatarUrl rating');
     if (!user) throw new AppError('NOT_FOUND', 'User not found', 404);
 
-    const inviteCode = generateInviteCode();
-    const battle = await Battle.create({
-      inviteCode,
-      state: 'WAITING',
-      scoringMode: options.scoringMode,
-      difficulty: options.difficulty,
-      durationSeconds: options.durationSeconds ?? env.DEFAULT_BATTLE_DURATION_SECONDS,
-      isPrivate: true,
-      participants: [
-        {
-          userId: user._id,
-          username: user.username,
-          avatarUrl: user.avatarUrl,
-          rating: user.rating,
-          status: 'connected',
-          isReady: false,
-          score: 0,
-          totalScore: 0,
-          submittedAt: null,
-          verdict: null,
-          ratingDelta: 0,
-          socketId: null,
-          lastSeenAt: new Date(),
-        },
-      ],
-    });
+    let battle: InstanceType<typeof Battle> | null = null;
+    for (let attempt = 0; attempt < 3 && !battle; attempt += 1) {
+      try {
+        battle = await Battle.create({
+          inviteCode: generateInviteCode(),
+          inviteExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          state: 'WAITING',
+          scoringMode: options.scoringMode,
+          difficulty: options.difficulty,
+          durationSeconds: options.durationSeconds ?? env.DEFAULT_BATTLE_DURATION_SECONDS,
+          isPrivate: true,
+          participants: [
+            {
+              userId: user._id,
+              username: user.username,
+              avatarUrl: user.avatarUrl,
+              rating: user.rating,
+              status: 'connected',
+              isReady: false,
+              score: 0,
+              totalScore: 0,
+              submittedAt: null,
+              verdict: null,
+              ratingDelta: 0,
+              socketId: null,
+              lastSeenAt: new Date(),
+            },
+          ],
+        });
+      } catch (error) {
+        if ((error as { code?: number }).code !== 11000 || attempt === 2) throw error;
+      }
+    }
+    if (!battle) throw new AppError('INVITE_CREATE_FAILED', 'Could not create a unique invite code', 500);
 
-    logger.info('Private battle created', { battleId: battle._id.toString(), userId, inviteCode });
+    logger.info('Private battle created', {
+      battleId: battle._id.toString(),
+      userId,
+      inviteCode: battle.inviteCode,
+    });
     return battle;
   }
 
@@ -70,34 +83,48 @@ export class BattleService {
     userId: string,
     socketId: string,
   ): Promise<InstanceType<typeof Battle>> {
-    const query = battleId ? { _id: battleId } : { inviteCode };
-    const battle = await Battle.findOne(query);
+    const normalizedCode = inviteCode?.trim().toUpperCase() ?? null;
+    const query = battleId ? { _id: battleId } : { inviteCode: normalizedCode };
+    let battle = await Battle.findOne(query);
 
     if (!battle) throw new AppError('NOT_FOUND', 'Battle not found', 404);
-    if (battle.state === 'COMPLETED' || battle.state === 'CANCELLED') {
-      throw new AppError('BATTLE_ENDED', 'Battle has ended', 400);
+
+    if (normalizedCode) {
+      const inviteError = getInviteError(battle, userId);
+      if (inviteError) throw new AppError(inviteError.code, inviteError.message, inviteError.status);
     }
 
     const existingParticipant = battle.participants.find((p) => p.userId.toString() === userId);
 
     if (existingParticipant) {
-      // Reconnecting
-      existingParticipant.socketId = socketId;
-      existingParticipant.status = 'connected';
-      existingParticipant.lastSeenAt = new Date();
-      await battle.save();
+      battle = await Battle.findOneAndUpdate(
+        { _id: battle._id, 'participants.userId': existingParticipant.userId },
+        {
+          $set: {
+            'participants.$.socketId': socketId,
+            'participants.$.lastSeenAt': new Date(),
+          },
+        },
+        { new: true },
+      ) ?? battle;
       logger.info('Participant reconnected', { battleId: battle._id.toString(), userId });
       return battle;
     }
 
-    if (battle.participants.length >= 2) {
-      throw new AppError('BATTLE_FULL', 'Battle is already full', 400);
+    if (battle.state !== 'WAITING') {
+      const code = ['COUNTDOWN', 'ACTIVE', 'FINALIZING', 'COMPLETED', 'CANCELLED', 'FAILED'].includes(battle.state)
+        ? 'BATTLE_ALREADY_STARTED'
+        : 'BATTLE_FULL';
+      throw new AppError(code, code === 'BATTLE_FULL' ? 'Battle is already full' : 'Battle has already started or ended', 409);
+    }
+    if (battle.inviteExpiresAt && battle.inviteExpiresAt <= new Date()) {
+      throw new AppError('INVITE_EXPIRED', 'This invite code has expired', 410);
     }
 
     const user = await User.findById(userId).select('username avatarUrl rating');
     if (!user) throw new AppError('NOT_FOUND', 'User not found', 404);
 
-    battle.participants.push({
+    const participant = {
       userId: user._id,
       username: user.username,
       avatarUrl: user.avatarUrl,
@@ -111,16 +138,43 @@ export class BattleService {
       ratingDelta: 0,
       socketId,
       lastSeenAt: new Date(),
-    });
-
-    // Transition to READY_CHECK once 2 players are in
-    if (battle.participants.length === 2) {
-      battle.state = 'READY_CHECK';
+    };
+    const joinFilter = {
+      _id: battle._id,
+      state: 'WAITING',
+      'participants.userId': { $ne: user._id },
+      $expr: { $lt: [{ $size: { $ifNull: ['$participants', []] } }, 2] },
+      $or: [
+        { inviteExpiresAt: null },
+        { inviteExpiresAt: { $exists: false } },
+        { inviteExpiresAt: { $gt: new Date() } },
+      ],
+    };
+    const joinedBattle = await Battle.findOneAndUpdate(
+      joinFilter,
+      {
+        $push: { participants: participant },
+        $set: { state: 'READY_CHECK' },
+      },
+      { new: true, runValidators: true },
+    );
+    if (joinedBattle) {
+      logger.info('Participant joined battle', { battleId: joinedBattle._id.toString(), userId });
+      return joinedBattle;
     }
 
-    await battle.save();
-    logger.info('Participant joined battle', { battleId: battle._id.toString(), userId });
-    return battle;
+    const latestBattle = await Battle.findById(battle._id);
+    if (!latestBattle) throw new AppError('NOT_FOUND', 'Battle not found', 404);
+    if (latestBattle.participants.some((p) => p.userId.toString() === userId)) {
+      return this.joinBattle(latestBattle._id.toString(), null, userId, socketId);
+    }
+    if (latestBattle.inviteExpiresAt && latestBattle.inviteExpiresAt <= new Date()) {
+      throw new AppError('INVITE_EXPIRED', 'This invite code has expired', 410);
+    }
+    if (latestBattle.state !== 'WAITING') {
+      throw new AppError('BATTLE_FULL', 'Battle already has two players or is no longer waiting', 409);
+    }
+    throw new AppError('BATTLE_FULL', 'Battle is already full', 409);
   }
 
   async setReady(
@@ -216,7 +270,8 @@ export class BattleService {
       }
     }, ms);
 
-    // Timer sync every 10 seconds
+    // The server remains authoritative; broadcast the remaining time every
+    // second so clients stay synchronized even when their clocks differ.
     const syncInterval = setInterval(async () => {
       const current = await Battle.findById(battleId);
       if (!current || current.state !== 'ACTIVE') {
@@ -229,7 +284,7 @@ export class BattleService {
         secondsRemaining: remaining,
         serverTime: new Date().toISOString(),
       });
-    }, 10000);
+    }, 1000);
   }
 
   async handleDisconnect(

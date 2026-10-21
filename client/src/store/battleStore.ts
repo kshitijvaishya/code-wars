@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { Battle, BattleState, BattleParticipant, Problem } from '../types';
+import { getRemainingBattleSeconds } from '../utils/battleTimer';
 
 interface BattleStoreState {
   battle: Battle | null;
@@ -24,15 +25,25 @@ export const useBattleStore = create<BattleStoreState>((set) => ({
   isMatchmaking: false,
   matchmakingDifficulty: 'medium',
 
-  setBattle: (battle) => set({ battle }),
+  setBattle: (battle) => set({
+    battle,
+    secondsRemaining: battle?.endTime && battle.state === 'ACTIVE'
+      ? getRemainingBattleSeconds(battle.endTime)
+      : battle?.state === 'COMPLETED' || battle?.state === 'CANCELLED' || battle?.state === 'FINALIZING'
+        ? 0
+        : 0,
+  }),
   setProblem: (problem) => set({ problem }),
 
   updateParticipant: (participant) =>
     set((state) => {
       if (!state.battle) return state;
-      const participants = state.battle.participants.map((p) =>
-        p.userId === participant.userId ? { ...p, ...participant } : p,
-      );
+      const exists = state.battle.participants.some((p) => p.userId === participant.userId);
+      const participants = exists
+        ? state.battle.participants.map((p) =>
+          p.userId === participant.userId ? { ...p, ...participant } : p,
+        )
+        : [...state.battle.participants, participant];
       return { battle: { ...state.battle, participants } };
     }),
 
@@ -46,6 +57,9 @@ export const useBattleStore = create<BattleStoreState>((set) => ({
           ...(startTime && { startTime }),
           ...(endTime && { endTime }),
         },
+        secondsRemaining: battleState === 'ACTIVE' && endTime
+          ? Math.max(0, Math.ceil((new Date(endTime).getTime() - Date.now()) / 1000))
+          : ['COMPLETED', 'CANCELLED', 'FINALIZING'].includes(battleState) ? 0 : state.secondsRemaining,
       };
     }),
 

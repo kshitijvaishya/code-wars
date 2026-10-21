@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { getSocket } from './useSocket';
@@ -9,6 +9,8 @@ export function useBattleSocket(battleId: string | undefined) {
   const { battle, setProblem } =
     useBattleStore();
   const navigate = useNavigate();
+  const [problemLoading, setProblemLoading] = useState(false);
+  const [problemError, setProblemError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!battleId) return;
@@ -46,10 +48,21 @@ export function useBattleSocket(battleId: string | undefined) {
     };
   }, [battleId, navigate]);
 
-  // Load problem when battle becomes ACTIVE
+  // Load the active problem both after the ACTIVE event and when entering an
+  // already-active battle after a refresh or reconnect.
   useEffect(() => {
-    if (battle?.state === 'ACTIVE' && battle.problemId) {
-      problemApi.get(battle.problemId).then(setProblem).catch(console.error);
-    }
+    if (!battle?.problemId || !['ACTIVE', 'COMPLETED', 'FINALIZING'].includes(battle.state)) return;
+    setProblemLoading(true);
+    setProblemError(null);
+    problemApi.get(battle.problemId)
+      .then(setProblem)
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : 'Unable to load the battle problem';
+        setProblemError(message);
+        setProblem(null);
+      })
+      .finally(() => setProblemLoading(false));
   }, [battle?.problemId, battle?.state, setProblem]);
+
+  return { problemLoading, problemError };
 }

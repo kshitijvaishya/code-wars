@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useBattleStore } from '../store/battleStore';
@@ -16,6 +17,7 @@ export default function WaitingRoomPage() {
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Load battle
   useEffect(() => {
@@ -32,20 +34,31 @@ export default function WaitingRoomPage() {
         }
         setBattle(b);
 
+        // The creator is already a participant, but still needs to join the
+        // Socket.IO room to receive ready and state updates.
+        if (b.participants.some((participant) => participant.userId === user?.id)) {
+          const socket = getSocket();
+          const joinRoom = () => socket?.emit('battle:join', { battleId: b.id }, () => undefined);
+          if (socket?.connected) joinRoom();
+          else socket?.once('connect', joinRoom);
+        }
+
         // If battle is already active, go to arena
         if (b.state === 'ACTIVE' || b.state === 'COUNTDOWN') {
           navigate(`/battle/${b.id}`);
           return;
         }
-      } catch {
-        toast.error('Battle not found');
-        navigate('/dashboard');
+      } catch (error) {
+        const message = axios.isAxiosError(error)
+          ? error.response?.data?.error?.message
+          : undefined;
+        setLoadError(message ?? 'Unable to load this battle');
       } finally {
         setLoading(false);
       }
     };
     load();
-  }, [code, navigate, routeBattleId, setBattle]);
+  }, [code, navigate, routeBattleId, setBattle, user?.id]);
 
   // Join via socket
   const joinBattle = async () => {
@@ -56,13 +69,16 @@ export default function WaitingRoomPage() {
       return;
     }
     setJoining(true);
-    socket.emit('battle:join', { battleId: battle.id }, (err: string | null) => {
+    socket.emit('battle:join', code
+      ? { inviteCode: code.trim().toUpperCase() }
+      : { battleId: battle.id }, (err: string | null, data?: { battleId: string }) => {
       setJoining(false);
       if (err) {
         toast.error(err);
         return;
       }
       toast.success('Joined battle!');
+      navigate(`/battle/${data?.battleId ?? battle.id}/waiting`);
     });
   };
 
@@ -76,18 +92,38 @@ export default function WaitingRoomPage() {
   const setReady = (ready: boolean) => {
     if (!battle) return;
     const socket = getSocket();
-    if (ready) socket?.emit('battle:ready', { battleId: battle.id });
-    else socket?.emit('battle:unready', { battleId: battle.id });
+    if (!socket?.connected) {
+      toast.error('Connection is not ready. Please try again.');
+      return;
+    }
+    const event = ready ? 'battle:ready' : 'battle:unready';
+    socket.emit(event, { battleId: battle.id }, (error?: string | null) => {
+      if (error) toast.error(error);
+    });
   };
 
-  const copyInviteLink = () => {
-    const link = `${window.location.origin}/battle/join/${battle?.inviteCode}`;
-    navigator.clipboard.writeText(link);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const copyInviteCode = async () => {
+    if (!battle) return;
+    try {
+      await navigator.clipboard.writeText(battle.inviteCode);
+      setCopied(true);
+      toast.success('Invite code copied');
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error('Could not copy invite code. Select and copy it manually.');
+    }
   };
 
   if (loading) return <div className="flex justify-center items-center min-h-screen"><Spinner size="lg" /></div>;
+  if (loadError) {
+    return (
+      <div className="mx-auto max-w-xl px-4 py-20 text-center">
+        <h1 className="text-xl font-bold text-accent-red">Unable to join battle</h1>
+        <p className="mt-3 text-gray-300">{loadError}</p>
+        <button onClick={() => navigate('/matchmaking')} className="btn-secondary mt-6">Back to battles</button>
+      </div>
+    );
+  }
   if (!battle) return null;
 
   const me = battle.participants.find((p) => p.userId === user?.id);
@@ -145,9 +181,12 @@ export default function WaitingRoomPage() {
           <div className="font-mono text-3xl font-bold tracking-widest text-brand-400 mb-3">
             {battle.inviteCode}
           </div>
-          <button onClick={copyInviteLink} className="btn-secondary text-sm">
-            {copied ? '✓ Copied!' : '📋 Copy invite link'}
+          <button onClick={copyInviteCode} className="btn-secondary text-sm">
+            {copied ? '✓ Copied!' : '📋 Copy invite code'}
           </button>
+          <p className="mt-2 text-xs text-gray-500">
+            Code expires {battle.inviteExpiresAt ? new Date(battle.inviteExpiresAt).toLocaleString() : 'when the battle starts'}
+          </p>
         </div>
       )}
 

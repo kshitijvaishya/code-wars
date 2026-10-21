@@ -14,19 +14,19 @@ const hiddenTestCaseSchema = z.object({
 });
 
 const problemFieldsSchema = {
-  title: z.string().trim().min(1).max(200),
-  difficulty: z.enum(['easy', 'medium', 'hard']),
+  title: z.string().trim().max(200).optional(),
+  difficulty: z.enum(['easy', 'medium', 'hard']).optional(),
   tags: z.array(z.string().trim().min(1).max(50)).default([]),
-  description: z.string().trim().min(1),
-  inputFormat: z.string().trim().min(1),
-  outputFormat: z.string().trim().min(1),
-  constraints: z.string().trim().min(1),
+  description: z.string().optional(),
+  inputFormat: z.string().optional(),
+  outputFormat: z.string().optional(),
+  constraints: z.string().optional(),
   notes: z.string().optional(),
-  sampleTestCases: z.array(sampleTestCaseSchema).min(1),
-  hiddenTestCases: z.array(hiddenTestCaseSchema).min(1),
-  timeLimitMs: z.number().int().positive().max(60000),
-  memoryLimitMb: z.number().int().positive().max(4096),
-  supportedLanguages: z.array(z.number().int().positive()).min(1),
+  sampleTestCases: z.array(sampleTestCaseSchema).default([]),
+  hiddenTestCases: z.array(hiddenTestCaseSchema).default([]),
+  timeLimitMs: z.number().int().positive().max(60000).optional(),
+  memoryLimitMb: z.number().int().positive().max(4096).optional(),
+  supportedLanguages: z.array(z.number().int().positive()).default([71, 62, 63, 74, 60, 91]),
   outputSizeLimitKb: z.number().int().positive().max(10240).optional(),
   status: z.enum(['draft', 'published', 'archived']).optional(),
   isPublished: z.boolean().optional(),
@@ -73,4 +73,10 @@ export function validateProblemPublication(problem: {
     }
   }
   return errors;
+}
+
+export function validateProblemCreation(
+  problem: Parameters<typeof validateProblemPublication>[0] & { status?: string },
+): string[] {
+  return problem.status === 'published' ? validateProblemPublication(problem) : [];
 }

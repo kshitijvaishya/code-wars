@@ -20,6 +20,7 @@ export interface IBattleParticipant {
 export interface IBattle extends Document {
   _id: mongoose.Types.ObjectId;
   inviteCode: string;
+  inviteExpiresAt: Date | null;
   state: BattleState;
   scoringMode: ScoringMode;
   difficulty: 'easy' | 'medium' | 'hard';
@@ -59,6 +60,7 @@ const ParticipantSchema = new Schema<IBattleParticipant>({
 const BattleSchema = new Schema<IBattle>(
   {
     inviteCode: { type: String, required: true, unique: true, index: true },
+    inviteExpiresAt: { type: Date, default: null, index: true },
     state: {
       type: String,
       enum: ['WAITING', 'READY_CHECK', 'COUNTDOWN', 'ACTIVE', 'FINALIZING', 'COMPLETED', 'CANCELLED', 'FAILED'],
