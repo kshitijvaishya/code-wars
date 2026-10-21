@@ -10,6 +10,14 @@
     font-family: 'Inter', system-ui, sans-serif;
   }
 
+  body {
+    @apply m-0 min-h-screen bg-dark-950 text-gray-100;
+  }
+
+  #root {
+    @apply min-h-screen;
+  }
+
   * {
     @apply border-dark-400;
   }

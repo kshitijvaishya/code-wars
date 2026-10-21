@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { Spinner } from '../components/ui/Spinner';
 import toast from 'react-hot-toast';
+import axios from 'axios';
 
 export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const navigate = useNavigate();
@@ -21,7 +22,7 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
       if (!form.username.match(/^[a-zA-Z0-9_-]{3,30}$/))
         e.username = 'Username must be 3–30 chars, alphanumeric, _ or -';
     }
-    if (!form.email.includes('@')) e.email = 'Valid email required';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Valid email required';
     if (form.password.length < 8) e.password = 'Password must be at least 8 characters';
     if (mode === 'register' && form.password !== form.confirm) e.confirm = 'Passwords do not match';
     setErrors(e);
@@ -40,8 +41,13 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
       toast.success(mode === 'login' ? 'Welcome back!' : 'Account created!');
       navigate('/dashboard');
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: { message?: string } } } })
-        ?.response?.data?.error?.message ?? 'Something went wrong';
+      const msg = axios.isAxiosError(err)
+        ? typeof err.response?.data?.error === 'string'
+          ? err.response.data.error
+          : err.response?.data?.message ?? 'Something went wrong'
+        : err instanceof Error
+          ? err.message
+          : 'Something went wrong';
       toast.error(msg);
     }
   };

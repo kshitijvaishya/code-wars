@@ -1,0 +1,35 @@
+import { Response } from 'express';
+
+export function sendSuccess<T>(res: Response, data: T, statusCode = 200): Response {
+  return res.status(statusCode).json({
+    success: true,
+    data,
+    requestId: res.req?.requestId,
+  });
+}
+
+export function sendError(
+  res: Response,
+  code: string,
+  message: string,
+  statusCode = 400,
+  details?: unknown,
+): Response {
+  return res.status(statusCode).json({
+    success: false,
+    error: { code, message, ...(details ? { details } : {}) },
+    requestId: res.req?.requestId,
+  });
+}
+
+export class AppError extends Error {
+  constructor(
+    public readonly code: string,
+    message: string,
+    public readonly statusCode: number = 400,
+    public readonly details?: unknown,
+  ) {
+    super(message);
+    this.name = 'AppError';
+  }
+}

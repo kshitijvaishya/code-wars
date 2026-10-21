@@ -1,6 +1,25 @@
-# ⚔️ Code Wars — 1v1 Coding Battle Platform
+# ⚔️ Code Wars — Serverless Tournament Platform
 
-A production-oriented real-time 1v1 coding battle platform built with React, Node.js, MongoDB, Socket.IO, and Piston API.
+A real-time competitive coding tournament platform built with React, Vercel Functions, MongoDB Atlas, and Piston API. Supports dynamic participant counts with admin-controlled matchmaking for college coding competitions.
+
+---
+
+## 🎯 Architecture
+
+**Serverless Deployment:**
+- ✅ Vercel Functions (no Express server)
+- ✅ MongoDB Atlas (cached connections)
+- ✅ Ably or Pusher (replaces Socket.IO)
+- ✅ Piston API (code execution)
+- ✅ Single repository deployment
+
+**Key Features:**
+- Dynamic participant counts (4, 6, 8, 10+)
+- Admin-controlled matchmaking with drag-and-drop
+- Three competitive rounds (MCQ, Debug, DSA)
+- Server-authoritative timers
+- Real-time leaderboards
+- Automatic question progression
 
 ---
 
@@ -9,114 +28,118 @@ A production-oriented real-time 1v1 coding battle platform built with React, Nod
 ### Prerequisites
 
 - Node.js 20+
-- MongoDB (local or Atlas)
-- Docker & Docker Compose (optional, for full stack)
+- MongoDB Atlas account
+- Vercel account
+- Ably account (for realtime) or Pusher
 - Piston API access (public or self-hosted)
 
 ### 1. Environment Setup
 
+Create `.env.local` for development:
+
 ```bash
-cp .env.example .env
-# Edit .env with your values
+# Database
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/codewars
+
+# JWT Authentication
+JWT_SECRET=<generate-64-char-secret>
+JWT_REFRESH_SECRET=<generate-64-char-secret>
+JWT_EXPIRES_IN=15m
+JWT_REFRESH_EXPIRES_IN=7d
+
+# Ably Realtime (get from ably.com)
+ABLY_API_KEY=your-ably-api-key
+
+# Piston Code Execution
+PISTON_BASE_URL=https://emkc.org/api/v2/piston
+PISTON_API_KEY=
+
+# Application
+NODE_ENV=development
+CLIENT_URL=http://localhost:3000
 ```
 
-Required variables:
-- `MONGODB_URI` — MongoDB connection string
-- `JWT_SECRET` — 64+ character random string
-- `JWT_REFRESH_SECRET` — Another 64+ character random string
-- `PISTON_BASE_URL` — Piston API URL (defaults to https://emkc.org/api/v2/piston)
-- `PISTON_API_KEY` — Optional: API key if your Piston deployment requires authentication
-
-Generate secrets:
+Generate JWT secrets:
 ```bash
 node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 ```
 
+**For Production:** Set all variables in Vercel Dashboard → Project Settings → Environment Variables
+
 ### 2. Install Dependencies
 
 ```bash
-npm install         # root (installs workspaces)
-cd server && npm install --legacy-peer-deps
-cd ../client && npm install --legacy-peer-deps
+npm install
+cd client && npm install
 ```
 
-### 3. Seed Database
+### 3. Run Development with Vercel CLI
 
 ```bash
-cd server
-npm run seed
-```
-This creates the admin user (from `.env` `ADMIN_*` vars) and sample problems.
+# Install Vercel CLI globally
+npm i -g vercel
 
-### 4. Run Development Servers
-
-**Terminal 1 — Backend:**
-```bash
-cd server
-npm run dev
-```
-
-**Terminal 2 — Frontend:**
-```bash
-cd client
-npm run dev
-```
-
-App: http://localhost:5173
-API: http://localhost:5000
-
----
-
-## Docker Compose (Full Stack)
-
-```bash
-docker-compose up -d
+# Run locally (emulates Vercel Functions)
+vercel dev
 ```
 
 This starts:
-- MongoDB (port 27017)
-- API server (port 5000)
-- Nginx frontend (port 80)
+- Frontend: http://localhost:3000
+- API Functions: http://localhost:3000/api/*
 
-The server uses the public Piston API by default. For production, consider:
-- Using a self-hosted Piston instance for better reliability and control
-- Setting up rate limiting and monitoring
-- Configuring appropriate resource limits
+**Or run client separately:**
+```bash
+# Terminal 1 - API
+vercel dev
 
-Access at: http://localhost
+# Terminal 2 - Client
+cd client && npm run dev
+```
+
+### 4. Deploy to Vercel
+
+```bash
+# Login to Vercel
+vercel login
+
+# Deploy (preview)
+vercel
+
+# Deploy to production
+vercel --prod
+```
+
+After deployment:
+1. Set environment variables in Vercel Dashboard
+2. Connect MongoDB Atlas
+3. Configure Ably credentials
+4. Optionally configure custom domain
 
 ---
 
 ## Architecture
 
-```
-client/          React + Vite + TypeScript + Tailwind + Monaco Editor
-server/          Node.js + Express + TypeScript + Mongoose
-shared/          Shared TypeScript types
-docker-compose   MongoDB + server + client
-```
+### Serverless Structure
 
-### Battle State Machine
 ```
-WAITING → READY_CHECK → COUNTDOWN → ACTIVE → FINALIZING → COMPLETED
-                    ↘                      ↘
-                 CANCELLED              FAILED
+code-wars/
+├── api/                    # Vercel Functions (Serverless)
+│   ├── auth/              # Authentication endpoints
+│   ├── tournaments/       # Tournament management
+│   ├── matches/           # Match operations
+│   ├── submissions/       # Code submission & judging
+│   └── health.ts          # Health check
+├── lib/                    # Shared backend logic
+│   ├── db/
+│   │   ├── connection.ts  # Cached MongoDB connection
+│   │   └── models/        # Mongoose models
+│   ├── auth/              # JWT & middleware
+│   ├── judging/           # Piston integration
+│   ├── tournament/        # Timer & matchmaking logic
+│   └── utils/             # Errors, logging, validation
+├── client/                 # React frontend
+└── vercel.json            # Vercel configuration
 ```
-
-### Scoring Modes
-| Mode | Description |
-|------|-------------|
-| `first_accepted` | First full solution wins (server timestamp) |
-| `score_based` | Most test cases passed wins |
-| `time_based` | Score first, then fastest accepted submission |
-| `best_of_three` | Three rounds, overall winner |
-
-### Rating System
-Elo-based with K-factor:
-- Rating < 1400: K = 32
-- Rating 1400–1999: K = 24  
-- Rating ≥ 2000: K = 16
-- Minimum rating: 100
 
 ---
 

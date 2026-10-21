@@ -21,5 +21,5 @@ export const authApi = {
     apiClient.post<{ data: { accessToken: string; refreshToken: string } }>('/auth/refresh', { refreshToken }).then(extractData),
 
   me: () =>
-    apiClient.get<{ data: { user: UserProfile } }>('/auth/me').then((r) => r.data.data.user),
+    apiClient.get<{ data: UserProfile }>('/auth/me').then((r) => r.data.data),
 };

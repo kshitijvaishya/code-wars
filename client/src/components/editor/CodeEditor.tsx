@@ -1,5 +1,6 @@
 import { useRef, useCallback } from 'react';
 import MonacoEditor, { type OnMount } from '@monaco-editor/react';
+import type { editor } from 'monaco-editor';
 import { Spinner } from '../ui/Spinner';
 
 interface CodeEditorProps {
@@ -21,7 +22,7 @@ export function CodeEditor({
   theme = 'vs-dark',
   height = '100%',
 }: CodeEditorProps) {
-  const editorRef = useRef<ReturnType<typeof MonacoEditor> | null>(null);
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 
   const handleMount: OnMount = useCallback((editor) => {
     editorRef.current = editor;
